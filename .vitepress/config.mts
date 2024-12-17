@@ -6,6 +6,8 @@ export default defineConfig({
   description: "press",
   // 源路径·
   srcDir: './src',
+  // base URL
+  base: '/kalaka-press/',
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
