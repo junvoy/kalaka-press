@@ -44,6 +44,15 @@ export default defineConfig({
       provider: 'local'
     },
 
+
+    lastUpdated: {
+      text: '最后更新时间',
+      formatOptions: {
+        dateStyle: 'full',
+        timeStyle: 'medium'
+      }
+    },
+
     // 页脚
     footer: {
       message: 'Released under the <a href="https://github.com/junvoy/kalaka-press/blob/main/LICENSE">MIT License.</a>',
