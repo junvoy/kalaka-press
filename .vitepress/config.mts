@@ -39,6 +39,11 @@ export default defineConfig({
       }
     ],
 
+    // 搜索
+    search: {
+      provider: 'local'
+    },
+
     // 页脚
     footer: {
       message: 'Released under the <a href="https://github.com/junvoy/kalaka-press/blob/main/LICENSE">MIT License.</a>',
