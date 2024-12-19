@@ -5,17 +5,17 @@ export default defineConfig({
   title: "kalaka-press",
   description: "press",
   // 源路径·
-  srcDir: './src',
+  srcDir: './',
   // base URL
-  base: '/kalaka-press/',
+  base: '/kalaka-press',
   // 显示最后更新时间
   lastUpdated: true,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     // 导航栏
     nav: [
-      { text: '首页', link: '/' },
-      { text: '葵花宝典', link: '/interview/introduction' }
+      { text: '首页', link: '/src' },
+      { text: '葵花宝典', link: '/src/interview/introduction' }
     ],
 
     // 侧边栏
@@ -23,15 +23,15 @@ export default defineConfig({
       {
         text: 'Examples',
         items: [
-          { text: 'Markdown Examples', link: '/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/api-examples' },
+          { text: 'Markdown Examples', link: '/src/markdown-examples' },
+          { text: 'Runtime API Examples', link: '/src/api-examples' },
           { 
             text: '葵花宝典', 
-            link: '/interview/introduction', 
+            link: '/src/interview/introduction', 
             items: [
               { 
                 text: 'Redis',
-                link: ''
+                link: '/src/interview/redis/question'
               }
             ]
           }

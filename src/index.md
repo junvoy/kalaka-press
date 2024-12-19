@@ -9,15 +9,15 @@ hero:
   actions:
     - theme: brand
       text: Markdown Examples
-      link: /markdown-examples
+      link: /src/markdown-examples
     - theme: alt
       text: API Examples
-      link: /api-examples
+      link: /src/api-examples
 
 features:
   - title: 葵花宝典
     details: 八股文
-    link: /interview/introduction
+    link: /src/interview/introduction
   - title: Feature B
     details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
   - title: Feature C
