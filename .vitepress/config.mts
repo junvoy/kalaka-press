@@ -10,6 +10,12 @@ export default defineConfig({
   base: '/kalaka-press',
   // 显示最后更新时间
   lastUpdated: true,
+  markdown: {
+    image: {
+      // 默认禁用；设置为 true 可为所有图片启用懒加载。
+      lazyLoading: true
+    }
+  },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     // 导航栏
@@ -46,9 +52,9 @@ export default defineConfig({
 
 
     lastUpdated: {
-      text: '最后更新时间',
+      text: '最后更新于',
       formatOptions: {
-        dateStyle: 'full',
+        dateStyle: 'short',
         timeStyle: 'medium'
       }
     },
