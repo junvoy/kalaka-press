@@ -65,6 +65,11 @@ export default defineConfig({
       copyright: 'Copyright © 2024-present <a href="https://github.com/junvoy">Yao</a>'
     },
 
+    editLink: {
+      pattern: 'https://github.com/junvoy/kalaka-press/edit/main/:path',
+      text: '在 GitHub 上编辑此页面'
+    },
+
     socialLinks: [
       { icon: 'github', link: 'https://github.com/junvoy' }
     ]
