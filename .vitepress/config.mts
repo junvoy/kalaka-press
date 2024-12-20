@@ -26,24 +26,21 @@ export default defineConfig({
 
     // 侧边栏
     sidebar: [
-      {
-        text: 'Examples',
+      { 
+        text: '数据库',
+        collapsed: true,
         items: [
-          { text: 'Markdown Examples', link: '/src/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/src/api-examples' },
-          { 
-            text: '葵花宝典', 
-            link: '/src/interview/introduction', 
-            items: [
-              { 
-                text: 'Redis',
-                link: '/src/interview/redis/question'
-              }
-            ]
+          {
+            text: 'Redis',
+            link: '/src/interview/redis/question',
           }
         ]
       }
     ],
+
+    outline: {
+      label: "页面导航"
+    },
 
     // 搜索
     search: {
