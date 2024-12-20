@@ -14,4 +14,4 @@ Redis 是一个非关系型（**NoSQL**）的内存数据库，使用一对 **Ke
 3. I/O 复用模型，基于epoll/select/kqueue等I/O多路复用技术实现高吞吐量网络I/O。  
 4. 单线程模型，避免了多线程的频繁上下文切换以及锁等同步机制的开销。  
 
-![why-redis-so-fast.jpg](/.image/interview/why-redis-so-fast.jpg)
+![why-redis-so-fast](/.image/interview/why-redis-so-fast.jpg)
