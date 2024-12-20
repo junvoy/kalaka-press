@@ -26,7 +26,7 @@ export default defineConfig({
     // https://vitepress.dev/reference/default-theme-config
     // 导航栏
     nav: [
-      { text: '首页', link: '/src' },
+      { text: '首页', link: '/' },
       { text: '葵花宝典', link: '/src/interview/introduction' }
     ],
 
