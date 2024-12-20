@@ -5,7 +5,7 @@ export default defineConfig({
   title: "kalaka-press",
   description: "press",
   // 源路径·
-  srcDir: './',
+  srcDir: '.',
   // base URL
   base: '/kalaka-press',
   // 显示最后更新时间
@@ -17,6 +17,10 @@ export default defineConfig({
       // 默认禁用；设置为 true 可为所有图片启用懒加载。
       lazyLoading: true
     }
+  },
+  // 路由重写
+  rewrites: {
+    'src/index.md': 'index.md',
   },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
