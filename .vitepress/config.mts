@@ -10,6 +10,8 @@ export default defineConfig({
   base: '/kalaka-press',
   // 显示最后更新时间
   lastUpdated: true,
+  // 删除 .html 后缀
+  cleanUrls: true,
   markdown: {
     image: {
       // 默认禁用；设置为 true 可为所有图片启用懒加载。
