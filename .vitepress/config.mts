@@ -27,7 +27,8 @@ export default defineConfig({
     // 导航栏
     nav: [
       { text: '首页', link: '/' },
-      { text: '葵花宝典', link: '/src/interview/introduction' }
+      { text: '葵花宝典', link: '/src/interview/introduction' },
+      { text: 'kalaka-admin', link: 'https://redhill.red' }
     ],
 
     // 侧边栏
