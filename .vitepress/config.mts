@@ -7,7 +7,7 @@ export default defineConfig({
   // 源路径·
   srcDir: '.',
   // base URL
-  base: '/kalaka-press',
+  base: '/',
   // 显示最后更新时间
   lastUpdated: true,
   // 删除 .html 后缀
