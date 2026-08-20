@@ -1,4 +1,34 @@
-# 依赖
-node_modules
-# vitepress 缓存
-cache
+# Dependencies
+node_modules/
+
+# pnpm local cache
+.pnpm-store/
+
+# VitePress generated files
+.vitepress/cache/
+.vitepress/dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+
+# Temporary and local files
+*.local
+*.tmp
+*~
