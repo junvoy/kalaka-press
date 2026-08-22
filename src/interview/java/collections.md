@@ -91,6 +91,60 @@ while (iterator.hasNext()) {
 
 并发场景应选择合适的并发集合。fail-fast 主要用于尽快暴露错误，不是严格的线程安全保证。
 
+### 9. Iterator 和增强 for 循环是什么关系？
+
+**面试一句话：** 增强 for 是遍历语法，遍历 Iterable 集合时编译器通常会转换为 Iterator；需要在遍历中安全删除当前元素时，应显式使用 Iterator 的 `remove()`。
+
+增强 for 也能遍历数组，但数组场景不会使用 Iterator。无论哪种写法，都不要在普通集合遍历期间直接调用集合自身的结构修改方法。
+
+## 排序与常用容器
+
+### 10. Comparable 和 Comparator 有什么区别？
+
+**面试一句话：** Comparable 由类型自己定义一种默认自然顺序；Comparator 是外部传入的比较规则，同一个类型可以拥有多种排序方式，业务代码通常更灵活。
+
+```java
+Comparator<User> byAgeThenName = Comparator
+    .comparingInt(User::getAge)
+    .thenComparing(User::getName);
+```
+
+比较器要满足自反性、对称性和传递性。不要直接用 `a - b` 比较整数，因为可能溢出，应使用 `Integer.compare(a, b)`。
+
+### 11. HashMap、LinkedHashMap 和 TreeMap 怎么选？
+
+| 类型 | 顺序特点 | 常见复杂度 | 典型场景 |
+| --- | --- | --- | --- |
+| `HashMap` | 不保证遍历顺序 | 查找通常 O(1) | 普通 Key-Value 查询 |
+| `LinkedHashMap` | 保持插入顺序，或配置为访问顺序 | 查找通常 O(1) | 稳定遍历、实现 LRU 思路 |
+| `TreeMap` | 按 Key 的自然顺序或比较器排序 | 查找 O(log n) | 排序、范围查询 |
+
+**面试一句话：** 只要快速查询通常选 HashMap；需要稳定的插入或访问顺序选 LinkedHashMap；需要按 Key 排序以及查找相邻、区间数据时选 TreeMap。
+
+TreeMap 判断 Key 是否相同主要依赖比较结果。比较器若与 `equals()` 含义不一致，可能出现看起来不同的 Key 被当作同一个 Key 的情况。
+
+### 12. Queue 和 Deque 有什么区别？
+
+**面试一句话：** Queue 通常表示先进先出的单端队列；Deque 支持在两端添加和删除，既能当队列，也能当栈使用，现代代码中通常优先用 ArrayDeque 替代 Stack。
+
+- 队列：`offerLast()` + `pollFirst()`。
+- 栈：`push()` + `pop()`，底层仍可用 ArrayDeque。
+- 需要线程阻塞等待任务时，应选择 `BlockingQueue` 的实现，而不是普通 ArrayDeque。
+
+ArrayDeque 不允许 null，因为 `poll()` 返回 null 常用来表示队列为空。
+
+### 13. CopyOnWriteArrayList 适合什么场景？
+
+**面试一句话：** CopyOnWriteArrayList 在写入时复制底层数组，读操作通常无需加互斥锁，适合读多写少且数据量不大的快照场景；写频繁或元素很多时复制成本很高。
+
+它的迭代器读取创建时的快照，不会看到之后的修改，也不支持通过迭代器修改集合。监听器列表、配置快照可能适合使用它；高频追加的消息列表通常不适合。
+
+### 14. 不可变集合和只读视图有什么区别？
+
+**面试一句话：** 真正的不可变集合创建后内容不能改变；只读视图只是不允许通过当前视图修改，原集合改变后，视图中的内容仍可能跟着变化。
+
+例如 `Collections.unmodifiableList(source)` 包装的是 `source` 的视图，调用方若仍持有 `source`，依然可以修改底层数据。需要稳定快照时，可根据 JDK 版本和 null 约束使用 `List.copyOf(source)` 等复制方法。
+
 ---
 
 [← 上一章：Java 基础](./basic) · [下一章：并发 →](./concurrency)
