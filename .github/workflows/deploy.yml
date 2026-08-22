@@ -27,28 +27,29 @@ jobs:
   # 构建工作
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # 如果未启用 lastUpdated，则不需要
-      - uses: pnpm/action-setup@v4 # 如果使用 pnpm，请取消此区域注释
-        with:
-          version: 9
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6 # 如果使用 pnpm，请取消此区域注释
       # - uses: oven-sh/setup-bun@v1 # 如果使用 Bun，请取消注释
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm # 或 npm / yarn
+          cache-dependency-path: pnpm-lock.yaml
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Install dependencies
-        run: pnpm install # 或 npm ci / yarn install / bun install
+        run: pnpm install --frozen-lockfile # 或 npm ci / yarn install / bun install
       - name: Build with VitePress
         run: pnpm docs:build # 或 npm run docs:build / yarn docs:build / bun run docs:build
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./.vitepress/dist
 
@@ -59,8 +60,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Deploy
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

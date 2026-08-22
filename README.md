@@ -1,54 +1,72 @@
-<header>
+# 葵花宝典
 
-<!--
-  <<< Author notes: Course header >>>
-  Include a 1280×640 image, course title in sentence case, and a concise description in emphasis.
-  In your repository settings: enable template repository, add your 1280×640 social image, auto delete head branches.
-  Add your open source license, GitHub uses MIT license.
--->
+一个基于 VitePress 构建的中文技术面试与求职知识库，内容强调从零理解、可直接复习，并使用可编辑流程图解释复杂概念。
 
-# GitHub Pages
+在线访问：[https://junvoy.github.io/kalaka-press/](https://junvoy.github.io/kalaka-press/)
 
-_Create a site or blog from your GitHub repositories with GitHub Pages._
+## 主要内容
 
-</header>
+- Java 面试：Java 基础、集合、并发、多线程和 JVM。
+- 数据库面试：MySQL、Redis 等常见问题。
+- 求职指南：简历编写、简历投递、面试准备与面试复盘。
+- 在线简历：适合网页展示的公开版本。
 
-<!--
-  <<< Author notes: Step 1 >>>
-  Choose 3-5 steps for your course.
-  The first step is always the hardest, so pick something easy!
-  Link to docs.github.com for further explanations.
-  Encourage users to open new tabs for steps!
--->
+## 本地开发
 
-## Step 1: Enable GitHub Pages
+建议使用 Node.js 24 LTS。pnpm 版本以 `package.json` 的 `packageManager` 字段为准。
 
-_Welcome to GitHub Pages and Jekyll :tada:!_
+```bash
+pnpm install --frozen-lockfile
+pnpm docs:dev
+```
 
-The first step is to enable GitHub Pages on this [repository](https://docs.github.com/en/get-started/quickstart/github-glossary#repository). When you enable GitHub Pages on a repository, GitHub takes the content that's on the main branch and publishes a website based on its contents.
+开发服务启动后，根据终端输出访问本地地址。
 
-### :keyboard: Activity: Enable GitHub Pages
+## 常用命令
 
-1. Open a new browser tab, and work on the steps in your second tab while you read the instructions in this tab.
-1. Under your repository name, click **Settings**.
-1. Click **Pages** in the **Code and automation** section.
-1. Ensure "Deploy from a branch" is selected from the **Source** drop-down menu, and then select `main` from the **Branch** drop-down menu.
-1. Click the **Save** button.
-1. Wait about _one minute_ then refresh this page (the one you're following instructions from). [GitHub Actions](https://docs.github.com/en/actions) will automatically update to the next step.
-   > Turning on GitHub Pages creates a deployment of your repository. GitHub Actions may take up to a minute to respond while waiting for the deployment. Future steps will be about 20 seconds; this step is slower.
-   > **Note**: In the **Pages** of **Settings**, the **Visit site** button will appear at the top. Click the button to see your GitHub Pages site.
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm docs:dev` | 启动本地开发服务 |
+| `pnpm diagrams:check` | 检查 SVG 引用、命名和 draw.io 可编辑数据 |
+| `pnpm typecheck` | 执行 TypeScript 类型检查 |
+| `pnpm docs:build` | 执行全部检查并构建生产站点 |
+| `pnpm docs:preview` | 预览生产构建结果 |
 
-<footer>
+## 项目结构
 
-<!--
-  <<< Author notes: Footer >>>
-  Add a link to get support, GitHub status page, code of conduct, license link.
--->
+```text
+.
+├── .image/                  # 站点图片与可编辑 SVG
+├── .vitepress/              # VitePress 配置、主题和组件
+├── docs/                    # 面向维护者的项目文档
+├── scripts/                 # 自动检查脚本
+├── src/
+│   ├── career/              # 求职指南
+│   ├── interview/           # 面试知识库
+│   └── resume/              # 在线简历
+├── AGENTS.md                # Agent 项目级工作说明
+└── package.json
+```
 
----
+## 流程图
 
-Get help: [Post in our discussion board](https://github.com/orgs/skills/discussions/categories/github-pages) &bull; [Review the GitHub status page](https://www.githubstatus.com/)
+Java 面试流程图按章节存放在 `.image/interview/java/`。仓库保留的 SVG 内嵌 draw.io 数据，可以直接重新打开和编辑。
 
-&copy; 2023 GitHub &bull; [Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md) &bull; [MIT License](https://gh.io/mit)
+新增或修改流程图前，请阅读 [流程图规范](docs/diagrams.md)。完成后执行：
 
-</footer>
+```bash
+pnpm diagrams:check
+pnpm docs:build
+```
+
+## 部署
+
+推送到 `main` 分支后，[GitHub Actions](.github/workflows/deploy.yml) 会使用 Node.js 24 LTS 构建站点，并部署到 GitHub Pages。
+
+## Agent 协作
+
+自动化编码工具开始工作前应先阅读 [AGENTS.md](AGENTS.md)，其中记录了本仓库的目录、验证和流程图约定。
+
+## License
+
+本项目使用 [MIT License](https://github.com/junvoy/kalaka-press/blob/main/LICENSE)。

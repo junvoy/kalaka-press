@@ -28,22 +28,57 @@ export default defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '葵花宝典', link: '/src/interview/introduction' },
+      { text: '求职指南', link: '/src/career/' },
       { text: 'kalaka-admin', link: 'https://redhill.red' }
     ],
 
     // 侧边栏
-    sidebar: [
-      { 
-        text: '数据库',
-        collapsed: true,
-        items: [
-          {
-            text: 'Redis',
-            link: '/src/interview/redis/question',
-          }
-        ]
-      }
-    ],
+    sidebar: {
+      '/src/interview/': [
+        {
+          text: 'Java',
+          collapsed: false,
+          items: [
+            {
+              text: '学习目录',
+              link: '/src/interview/java/question',
+            },
+            { text: '1. Java 基础', link: '/src/interview/java/basic' },
+            { text: '2. Java 集合', link: '/src/interview/java/collections' },
+            { text: '3. 并发', link: '/src/interview/java/concurrency' },
+            { text: '4. 多线程', link: '/src/interview/java/multithreading' },
+            { text: '5. JVM', link: '/src/interview/java/jvm' }
+          ]
+        },
+        {
+          text: '数据库',
+          collapsed: true,
+          items: [
+            {
+              text: 'MySQL',
+              link: '/src/interview/mysql/question',
+            },
+            {
+              text: 'Redis',
+              link: '/src/interview/redis/question',
+            }
+          ]
+        }
+      ],
+      '/src/career/': [
+        {
+          text: '求职指南',
+          items: [
+            { text: '开始', link: '/src/career/' },
+            { text: '1. 编写简历', link: '/src/career/resume-writing' },
+            { text: '2. 简历样式', link: '/src/career/resume-style' },
+            { text: '3. 简历投递', link: '/src/career/resume-delivery' },
+            { text: '4. 面试指南', link: '/src/career/interview-guide' },
+            { text: '5. 面试复盘', link: '/src/career/interview-review' }
+          ]
+        }
+      ]
+    },
 
     outline: {
       label: "页面导航"

@@ -1,28 +1,40 @@
 import DefaultTheme from 'vitepress/theme';
-import { onMounted, watch, nextTick } from 'vue';
+import { nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vitepress';
-import mediumZoom from 'medium-zoom';
+import mediumZoom, { type Zoom } from 'medium-zoom';
 
 import './index.css';
+
+const DIAGRAM_SELECTOR = '.vp-doc img[src$=".svg"]';
 
 export default {
   ...DefaultTheme,
 
   setup() {
     const route = useRoute();
-    const initZoom = () => {
-      // https://github.com/vuejs/vitepress/issues/854
-      // 局部
-      // mediumZoom('[data-zoomable]', { background: 'var(--vp-c-bg)' });
-      // 全局
-      mediumZoom('.main img', { background: 'var(--vp-c-bg)' });
+    let zoom: Zoom | undefined;
+
+    const refreshDiagramZoom = () => {
+      zoom ??= mediumZoom({
+        background: 'var(--vp-c-bg)',
+        margin: 24,
+        scrollOffset: 40,
+      });
+
+      zoom.detach();
+      zoom.attach(DIAGRAM_SELECTOR);
     };
-    onMounted(() => {
-      initZoom();
-    });
+
+    onMounted(refreshDiagramZoom);
+
     watch(
       () => route.path,
-      () => nextTick(() => initZoom())
+      () => nextTick(refreshDiagramZoom)
     );
+
+    onUnmounted(() => {
+      zoom?.detach();
+      zoom = undefined;
+    });
   },
 };
