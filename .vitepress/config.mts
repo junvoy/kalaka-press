@@ -28,6 +28,7 @@ export default defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '葵花宝典', link: '/src/interview/introduction' },
+      { text: '天机秘卷', link: '/src/interview/ai/' },
       { text: '求职指南', link: '/src/career/' },
       { text: 'kalaka-admin', link: 'https://redhill.red' }
     ],
@@ -62,6 +63,20 @@ export default defineConfig({
               text: 'Redis',
               link: '/src/interview/redis/question',
             }
+          ]
+        }
+      ],
+      '/src/interview/ai/': [
+        {
+          text: '天机秘卷',
+          collapsed: false,
+          items: [
+            { text: '专栏导览', link: '/src/interview/ai/' },
+            { text: 'AI 基础概念', link: '/src/interview/ai/fundamentals/question' },
+            { text: 'AI Agent 工程化', link: '/src/interview/ai/agent/question' },
+            { text: 'OpenAI SDK 与 Responses API', link: '/src/interview/ai/sdk/question' },
+            { text: 'LangChain 与 LangGraph 编排', link: '/src/interview/ai/langchain/question' },
+            { text: '三个落地案例', link: '/src/interview/ai/cases/question' }
           ]
         }
       ],
