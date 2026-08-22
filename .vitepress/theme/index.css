@@ -1,13 +1,5 @@
-.medium-zoom-overlay {
-    z-index: 100;
-}
-
-.medium-zoom-image--opened {
-    z-index: 101;
-}
-
-.medium-zoom--opened {
-    overflow: hidden;
+.vp-doc img:not([data-no-preview]) {
+    cursor: zoom-in;
 }
 
 .vp-doc img[src$='.svg'] {
@@ -19,16 +11,99 @@
     background: var(--vp-c-bg);
 }
 
+.pswp {
+    --pswp-bg: #fff;
+    --pswp-placeholder-bg: #fff;
+    --pswp-icon-color: #25272d;
+    --pswp-icon-color-secondary: #fff;
+    --pswp-icon-stroke-color: #fff;
+    --pswp-error-text-color: #25272d;
+    --pswp-preloader-color: rgb(37 39 45 / 35%);
+    --pswp-preloader-color-secondary: rgb(37 39 45 / 80%);
+}
+
+.pswp__top-bar {
+    padding: 8px 12px;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 96%), transparent);
+}
+
+.pswp__button {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.pswp__button:hover {
+    background: rgb(37 39 45 / 8%);
+}
+
+.pswp__button:active {
+    transform: scale(0.94);
+}
+
+.pswp__counter {
+    height: 48px;
+    padding: 0 14px;
+    color: rgb(37 39 45 / 78%);
+    font-size: 14px;
+    line-height: 48px;
+    text-shadow: none;
+}
+
+.pswp__caption {
+    position: absolute;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 10;
+    max-width: min(720px, calc(100% - 32px));
+    padding: 8px 14px;
+    transform: translateX(-50%);
+    border: 1px solid rgb(37 39 45 / 10%);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 88%);
+    box-shadow: 0 8px 28px rgb(15 23 42 / 10%);
+    color: rgb(37 39 45 / 88%);
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    pointer-events: none;
+    backdrop-filter: blur(12px);
+}
+
 @media (max-width: 640px) {
     .vp-doc img[src$='.svg'] {
         margin: 18px auto;
         border-radius: 8px;
     }
+
+    .pswp__top-bar {
+        padding: max(4px, env(safe-area-inset-top)) 4px 0;
+    }
+
+    .pswp__button {
+        width: 52px;
+        height: 52px;
+    }
+
+    .pswp__counter {
+        height: 52px;
+        padding-inline: 12px;
+        line-height: 52px;
+    }
+
+    .pswp__caption {
+        bottom: max(12px, env(safe-area-inset-bottom));
+        max-width: calc(100% - 24px);
+        padding: 7px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .medium-zoom-overlay,
-    .medium-zoom-image {
+    .pswp,
+    .pswp * {
         transition-duration: 0.01ms !important;
     }
 }
