@@ -45,7 +45,7 @@ worker.start(); // 在新线程执行
 
 **面试一句话：** Java 定义了 NEW、RUNNABLE、BLOCKED、WAITING、TIMED_WAITING 和 TERMINATED 六种线程状态；操作系统层面的“正在运行”和“可运行”在 Java 中通常都归入 RUNNABLE。
 
-![Java 线程状态及常见转换](../../../.image/interview/java/multithreading/thread-states.svg)
+![Java 线程状态及常见转换](/.image/interview/java/multithreading/thread-states.svg)
 
 - **BLOCKED**：等待进入 synchronized 保护的区域。
 - **WAITING**：无限期等待其他线程唤醒，例如 `wait()`、`join()`。
@@ -90,11 +90,28 @@ while (!Thread.currentThread().isInterrupted()) {
 
 **面试一句话：** 重点参数包括核心线程数、最大线程数、空闲存活时间、任务队列、线程工厂和拒绝策略；提交任务后通常先使用核心线程，再进入队列，队列满后创建非核心线程，最后触发拒绝策略。
 
-![线程池提交任务的判断流程](../../../.image/interview/java/multithreading/thread-pool-submit.svg)
+![线程池提交任务的判断流程](/.image/interview/java/multithreading/thread-pool-submit.svg)
 
 最容易记错的是顺序：达到核心线程数后，任务通常先排队；只有队列也放不下时，才继续创建线程直到最大线程数。线程和队列都到上限后，才会执行拒绝策略。
 
 参数必须结合任务类型、耗时、峰值流量和机器资源压测决定。不要只背“CPU 核数加一”，也不要无脑使用无界队列，否则任务积压可能导致 OOM。
+
+#### 源码解析：`ThreadPoolExecutor.execute` 的三段式决策
+
+以 [OpenJDK 21 `ThreadPoolExecutor.execute`](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/concurrent/ThreadPoolExecutor.java) 为例，任务不是“直接放队列”。方法按下面顺序决策：
+
+```text
+if (workerCount < corePoolSize) {
+    addWorker(command, true);             // 1. 先补核心线程
+} else if (workQueue.offer(command)) {
+    if (线程池已停止) remove(command);     // 2. 入队后必须二次确认运行状态
+    else if (workerCount == 0) addWorker(null, false);
+} else if (!addWorker(command, false)) {
+    reject(command);                      // 3. 队列满后才尝试最大线程，仍失败则拒绝
+}
+```
+
+因此，队列类型会直接改变扩容行为：无界队列通常使线程数很少超过 `corePoolSize`；直接交接队列倾向于更快创建非核心线程；有界队列让排队、扩容和拒绝都可控。不要只背参数名，面试时要能按这三段解释任务为何被执行、排队或拒绝。
 
 ### 9. 线程池有哪些拒绝策略？
 

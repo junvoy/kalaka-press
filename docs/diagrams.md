@@ -1,21 +1,32 @@
-# Java 面试流程图规范
+# 面试题流程图规范
 
 本文档供内容维护者和 Agent 共同使用。Agent 的项目级入口位于根目录 `AGENTS.md`。
 
-Java 面试题流程图统一存放在项目根目录的 `.image/interview/java/`，网页通过 Markdown 的标准图片语法引用。
+流程图统一存放在项目根目录的 `.image/interview/<技术架构>/<章节>/`，网页通过 Markdown 的标准图片语法引用。
 
 按内容章节分包存储：
 
-- `basic/`：Java 基础
-- `collections/`：Java 集合
-- `concurrency/`：并发
-- `multithreading/`：多线程
-- `jvm/`：JVM
+- `java/basic/`：Java 基础
+- `java/collections/`：Java 集合
+- `java/concurrency/`：并发
+- `java/multithreading/`：多线程
+- `java/jvm/`：JVM
+- `web/io-network/`：I/O 与网络
+- `spring/bean/`：Spring 与 Spring Boot
+- `persistence/<章节>/`：数据访问与持久化
+- `redis/<章节>/`：Redis 缓存与数据结构
+- `middleware/mq/`：消息队列
+- `distributed/idempotency/`：分布式系统
+- `microservices/<章节>/`：微服务治理
+- `iot/<章节>/`：车联网与实时通信
+- `integration/<章节>/`：配置、调度与数据集成
+- `ai-agent/<章节>/`：AI Agent 工程化
+- `operations/<章节>/`：可观测性与交付
 
 ## 文件约定
 
 - 文件名使用小写英文和连字符，例如 `thread-pool-submit.svg`。
-- SVG 必须放在对应的章节目录中，不在 Java 图片根目录平铺。
+- SVG 必须放在对应的技术架构和章节目录中，不能平铺。
 - 仓库只保留最终的 `.svg`，不提交临时 `.mmd` 和 `.drawio`。
 - SVG 必须使用 draw.io 的 `Embed Diagram` 方式导出，保证浏览器能显示，也能重新在 draw.io 中编辑。
 - 一张图只解释一个核心问题，节点文字尽量控制在两行以内。
@@ -49,7 +60,7 @@ Java 面试题流程图统一存放在项目根目录的 `.image/interview/java/
    ```
 
 4. 删除临时 `.mmd` 和 `.drawio`，只提交 `name.svg`。
-5. 将 SVG 放入 `.image/interview/java/<章节>/`，并在 Markdown 中使用相对路径引用。
+5. 将 SVG 放入 `.image/interview/<技术架构>/<章节>/`，并在 Markdown 中使用相对路径引用。
 6. 执行 `pnpm diagrams:check` 和 `pnpm docs:build`。
 
 也可以直接用 draw.io 打开现有 SVG，编辑后覆盖保存。保存时必须继续启用 `Embed Diagram`，否则自动检查会失败。

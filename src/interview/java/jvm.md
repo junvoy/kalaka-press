@@ -12,7 +12,7 @@ JVM 负责加载并运行 Java 字节码。本章从内存区域开始，再解�
 
 **面试一句话：** 堆和方法区由线程共享，主要存放对象实例、类元数据等；程序计数器、虚拟机栈和本地方法栈是线程私有的，记录每个线程自己的执行状态。
 
-![JVM 运行时内存区域](../../../.image/interview/java/jvm/jvm-memory.svg)
+![JVM 运行时内存区域](/.image/interview/java/jvm/jvm-memory.svg)
 
 “对象都在堆上”适合作为入门理解，但 JIT 可能通过逃逸分析做标量替换等优化，因此不能把它当成绝对规则。
 
@@ -56,7 +56,7 @@ JVM 负责加载并运行 Java 字节码。本章从内存区域开始，再解�
 
 **面试一句话：** Minor GC 通常回收年轻代；Major GC 常指老年代回收，但术语在不同收集器和工具中可能不完全一致；Full GC 通常涉及整个堆，停顿往往更明显。
 
-![对象从年轻代进入老年代的简化流程](../../../.image/interview/java/jvm/generational-gc.svg)
+![对象从年轻代进入老年代的简化流程](/.image/interview/java/jvm/generational-gc.svg)
 
 小白可以先记住：大多数新对象先进入年轻代，而且很快就不再使用；少数多次回收后仍存活的对象，才可能晋升到老年代。实际晋升条件和区域组织方式取决于收集器与 JVM 参数。
 
@@ -72,7 +72,7 @@ JVM 负责加载并运行 Java 字节码。本章从内存区域开始，再解�
 
 **面试一句话：** G1 把堆划分为多个大小相等的 Region，根据垃圾收益和停顿目标选择一部分 Region 回收；它仍有年轻代和老年代概念，但这些区域在物理上不要求连续。
 
-![G1 Region 与回收方式](../../../.image/interview/java/jvm/g1-regions.svg)
+![G1 Region 与回收方式](/.image/interview/java/jvm/g1-regions.svg)
 
 G1 的核心不是“完全没有停顿”，而是尽量预测并控制每次回收的工作量。Young GC 主要处理年轻代 Region，Mixed GC 还会选择部分老年代 Region 一起回收。
 
@@ -82,7 +82,7 @@ G1 的核心不是“完全没有停顿”，而是尽量预测并控制每次�
 
 **面试一句话：** 类的生命周期通常包括加载、验证、准备、解析、初始化、使用和卸载；其中验证、准备、解析合称连接。
 
-![Java 类从加载到卸载的生命周期](../../../.image/interview/java/jvm/class-loading.svg)
+![Java 类从加载到卸载的生命周期](/.image/interview/java/jvm/class-loading.svg)
 
 - **加载**：读取字节码并生成 Class 对象。
 - **验证**：检查字节码是否符合规范和安全要求。

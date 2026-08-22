@@ -30,7 +30,7 @@ outline: [2, 3]
 
 **面试一句话：** ArrayList 容量不足时会创建更大的新数组，再把旧数组内容复制过去；扩容有成本，所以已知数据规模时可以提前指定初始容量。
 
-![ArrayList 添加元素和扩容流程](../../../.image/interview/java/collections/arraylist-grow.svg)
+![ArrayList 添加元素和扩容流程](/.image/interview/java/collections/arraylist-grow.svg)
 
 以常见 JDK 实现为例，ArrayList 通常扩为原容量的约 1.5 倍。具体细节可能随 JDK 版本变化，更重要的是理解“新建更大数组 + 复制元素”。
 
@@ -42,13 +42,34 @@ outline: [2, 3]
 
 **面试一句话：** HashMap 先根据 Key 的 hash 值定位数组桶；发生哈希冲突时，同一个桶中的元素使用链表保存，满足条件后可转为红黑树，以改善冲突严重时的查询性能。
 
-![HashMap 数组、链表和红黑树结构](../../../.image/interview/java/collections/hashmap-structure.svg)
+![HashMap 数组、链表和红黑树结构](/.image/interview/java/collections/hashmap-structure.svg)
 
-![HashMap 写入数据的简化流程](../../../.image/interview/java/collections/hashmap-put-flow.svg)
+![HashMap 写入数据的简化流程](/.image/interview/java/collections/hashmap-put-flow.svg)
 
 查找时不是只比较 hash 值。HashMap 会先定位桶，再结合 hash 和 `equals()` 找到真正的 Key。
 
 在常见 JDK 8 实现中，链表长度达到 8 且数组容量至少为 64 时才会树化；容量较小时通常优先扩容。这里属于版本相关的源码细节。
+
+#### 源码解析：`HashMap.putVal` 如何决定写入位置
+
+以 [OpenJDK 21 `HashMap.putVal`](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java) 为例，`put()` 先计算扰动后的 hash，再把真正的写入交给 `putVal`。下面是保留关键分支的等价读法：
+
+```text
+if (table == null || table.length == 0) resize();
+int index = (table.length - 1) & hash;
+if (table[index] == null) {
+    table[index] = newNode(hash, key, value, null);
+} else if (hash 和 key 都相同) {
+    // 找到旧节点：覆盖 value
+} else if (桶已经是 TreeNode) {
+    putTreeVal(...);
+} else {
+    // 遍历链表；没有同 key 节点就追加，过长时 treeifyBin(...)
+}
+if (++size > threshold) resize();
+```
+
+这段代码对应四个面试要点：数组还没创建时先扩容初始化；`(n - 1) & hash` 只在容量为 2 的幂时才能等价于高效取模；冲突时先比较 `hash` 再比较 `equals`；`size` 超过阈值才扩容。树化不是“冲突一次就变红黑树”，而是降低长链表的最坏查找成本。
 
 ### 5. HashMap 为什么把容量设计成 2 的幂？
 

@@ -27,7 +27,7 @@ function goBack() {
         返回上一页
       </button>
       <div>
-        <a :href="careerGuideUrl">求职指南</a>
+        <a :href="careerGuideUrl">青云策</a>
         <span aria-hidden="true">/</span>
         <span>网页简历</span>
       </div>

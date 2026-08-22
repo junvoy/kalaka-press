@@ -4,10 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const contentRoot = join(projectRoot, 'src');
-const diagramRoot = join(projectRoot, '.image/interview/java');
+const diagramRoot = join(projectRoot, '.image/interview');
 const maxSvgBytes = 512 * 1024;
 const ignoredDirectories = new Set(['.git', '.vitepress', 'node_modules']);
-const chapterDirectories = new Set(['basic', 'collections', 'concurrency', 'multithreading', 'jvm']);
+const technologyDirectories = new Set([
+  'java', 'web', 'spring', 'persistence', 'redis', 'middleware', 'distributed',
+  'microservices', 'iot', 'integration', 'ai-agent', 'operations'
+]);
 const errors: string[] = [];
 const referencedSvgFiles = new Set<string>();
 
@@ -40,11 +43,14 @@ for (const markdownPath of walk(contentRoot, '.md')) {
     const rawTarget = match[2] ?? '';
     const target = rawTarget.trim().replace(/^<|>$/g, '').split(/[?#]/, 1)[0] ?? '';
 
-    if (/^(?:https?:|data:|\/)/.test(target)) {
+    if (/^(?:https?:|data:)/.test(target)) {
       continue;
     }
 
-    const svgPath = resolve(dirname(markdownPath), decodeURIComponent(target));
+    const decodedTarget = decodeURIComponent(target);
+    const svgPath = decodedTarget.startsWith('/')
+      ? resolve(projectRoot, `.${decodedTarget}`)
+      : resolve(dirname(markdownPath), decodedTarget);
     referencedSvgFiles.add(svgPath);
 
     if (!altText.trim()) {
@@ -62,13 +68,13 @@ const diagramFiles = walk(diagramRoot, '.svg');
 for (const svgPath of diagramFiles) {
   const relativePath = relative(diagramRoot, svgPath);
   const pathParts = relativePath.split(sep);
-  const chapter = pathParts[0] ?? '';
+  const technology = pathParts[0] ?? '';
   const filename = basename(svgPath);
   const svg = readFileSync(svgPath, 'utf8');
   const size = statSync(svgPath).size;
 
-  if (pathParts.length !== 2 || !chapterDirectories.has(chapter)) {
-    errors.push(`${relativePath} 必须放在 Java 章节分包目录中`);
+  if (pathParts.length !== 3 || !technologyDirectories.has(technology)) {
+    errors.push(`${relativePath} 必须放在已定义的技术架构目录和章节目录中`);
   }
 
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.svg$/.test(filename)) {

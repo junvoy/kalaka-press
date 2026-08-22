@@ -24,7 +24,7 @@ outline: [2, 3]
 
 **面试一句话：** `javac` 先把 `.java` 源码编译为平台无关的 `.class` 字节码，JVM 再通过解释执行和即时编译把字节码转换为当前机器能执行的机器码。
 
-![Java 源码从编译到运行的流程](../../../.image/interview/java/basic/java-run-flow.svg)
+![Java 源码从编译到运行的流程](/.image/interview/java/basic/java-run-flow.svg)
 
 这就是 Java 常说的“一次编译，到处运行”：相同的字节码可以交给 Windows、Linux 或 macOS 上各自的 JVM 运行。
 
