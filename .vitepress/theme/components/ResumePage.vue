@@ -200,7 +200,7 @@ function goBack() {
 
 <style scoped>
 .web-resume {
-  width: min(1240px, calc(100% - 48px));
+  width: min(1240px, calc(100% - var(--kp-page-gutter-desktop)));
   margin: 0 auto;
   padding: 48px 0 72px;
   color: var(--vp-c-text-1);
@@ -725,9 +725,9 @@ function goBack() {
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 640px) {
   .web-resume {
-    width: calc(100% - 24px);
+    width: calc(100% - var(--kp-page-gutter-mobile));
     padding: 20px 0 40px;
   }
 

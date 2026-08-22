@@ -1,3 +1,47 @@
+:root {
+    /* Shared Vite-inspired design tokens. */
+    --vp-c-brand-1: #646cff;
+    --vp-c-brand-2: #747bff;
+    --vp-c-brand-3: #535bf2;
+    --vp-c-brand-soft: rgb(100 108 255 / 14%);
+    --kp-page-gutter-desktop: 48px;
+    --kp-page-gutter-mobile: 24px;
+
+    /* Keep code examples on Vite's dark reading surface in both themes. */
+    --vp-code-block-bg: #161618;
+    --vp-code-block-color: #d9d9dd;
+    --vp-code-block-divider-color: #2d2d32;
+    --vp-code-line-highlight-color: rgb(255 255 255 / 7%);
+    --vp-code-line-number-color: #6f6f78;
+    --vp-code-copy-code-border-color: #3a3a40;
+    --vp-code-copy-code-bg: #242429;
+    --vp-code-copy-code-hover-border-color: #62626c;
+    --vp-code-copy-code-hover-bg: #303036;
+    --vp-code-tab-bg: #161618;
+    --vp-code-tab-divider: #2d2d32;
+    --vp-code-tab-text-color: #9e9ea7;
+    --vp-code-tab-hover-text-color: #f2f2f3;
+    --vp-code-tab-active-text-color: #f2f2f3;
+}
+
+.dark {
+    --vp-c-brand-1: #a8b1ff;
+    --vp-c-brand-2: #5c73e7;
+    --vp-c-brand-3: #3e63dd;
+    --vp-c-brand-soft: rgb(100 108 255 / 16%);
+}
+
+.vp-doc div[class*='language-'],
+.vp-block {
+    border: 1px solid var(--vp-code-block-divider-color);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 12%);
+}
+
+/* Shiki emits both palettes; always select the dark one for code blocks. */
+html:not(.dark) .vp-code span {
+    color: var(--shiki-dark, inherit);
+}
+
 .vp-doc img:not([data-no-preview]) {
     cursor: zoom-in;
 }

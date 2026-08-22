@@ -148,7 +148,7 @@ const principles = [
 
 <style scoped>
 .career-overview {
-  width: min(1120px, calc(100% - 48px));
+  width: min(1120px, calc(100% - var(--kp-page-gutter-desktop)));
   margin: 0 auto;
   padding: 48px 0 72px;
   color: var(--vp-c-text-1);
@@ -453,7 +453,7 @@ const principles = [
   font-size: 13px;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 960px) {
   .career-hero {
     grid-template-columns: 1fr;
     padding: 38px;
@@ -481,9 +481,9 @@ const principles = [
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .career-overview {
-    width: calc(100% - 24px);
+    width: calc(100% - var(--kp-page-gutter-mobile));
     padding: 20px 0 40px;
   }
 
