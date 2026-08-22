@@ -116,6 +116,28 @@ html:not(.dark) .vp-code span {
 }
 
 @media (max-width: 640px) {
+    .vp-doc div[class*='language-'],
+    .vp-block {
+        margin-inline: 0;
+        border-radius: 8px;
+    }
+
+    .vp-doc [class*='language-'] pre {
+        padding-block: 14px;
+    }
+
+    .vp-doc [class*='language-'] code {
+        padding-inline: 16px;
+        font-size: 12px;
+        line-height: 1.65;
+    }
+
+    .vp-doc [class*='language-'] code .highlighted {
+        margin-inline: -16px;
+        padding-inline: 16px;
+        width: calc(100% + 32px);
+    }
+
     .vp-doc img[src$='.svg'] {
         margin: 18px auto;
         border-radius: 8px;
