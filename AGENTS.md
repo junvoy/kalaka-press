@@ -6,6 +6,7 @@
 
 - 使用 pnpm，版本以 `package.json` 的 `packageManager` 字段为准。
 - 修改后至少执行 `pnpm docs:build`；该命令会同时检查流程图、TypeScript 类型和 VitePress 构建。
+- 不要直接向 `main` 推送；修改必须在功能分支提交，并通过 Pull Request 合并到 `main`。
 - 不要覆盖与当前任务无关的工作区改动。
 - 未经用户明确要求，不要提交或推送 Git 变更。
 

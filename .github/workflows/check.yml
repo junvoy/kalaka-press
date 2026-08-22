@@ -1,0 +1,44 @@
+# 在合并到 main 前检查 VitePress 站点
+name: Check VitePress site
+
+on:
+  # 仅验证目标分支为 main 的 Pull Request，不执行部署
+  pull_request:
+    branches: [main]
+
+# 检查任务只需要读取仓库内容
+permissions:
+  contents: read
+
+# 同一个 Pull Request 有新提交时，取消旧检查以节省运行时间
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Build and validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # VitePress lastUpdated 需要完整 Git 历史
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 包含流程图检查、TypeScript 类型检查和 VitePress 生产构建
+      - name: Check and build
+        run: pnpm docs:build

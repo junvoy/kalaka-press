@@ -61,7 +61,7 @@ pnpm docs:build
 
 ## 部署
 
-推送到 `main` 分支后，[GitHub Actions](.github/workflows/deploy.yml) 会使用 Node.js 24 LTS 构建站点，并部署到 GitHub Pages。
+`main` 是受保护分支，不允许直接推送。所有修改需要从功能分支发起 Pull Request，并通过 [PR 检查](.github/workflows/check.yml)；合并到 `main` 后，[部署工作流](.github/workflows/deploy.yml) 会使用 Node.js 24 LTS 构建站点并部署到 GitHub Pages。
 
 ## Agent 协作
 
