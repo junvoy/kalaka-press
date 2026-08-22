@@ -18,7 +18,7 @@ export const resume = {
     name: '李瑶',
     personalInfo: '个人信息已隐藏',
     phone: '177****5843',
-    email: 'skr***@163.com',
+    email: 'skr12332@163.com',
     experience: '6 年工作经验',
     intention: 'Java / AI Agent 应用',
     city: '深圳',

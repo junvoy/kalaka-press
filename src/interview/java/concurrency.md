@@ -64,7 +64,7 @@ try {
 
 **面试一句话：** 在部分 HotSpot 版本中，synchronized 会根据竞争情况使用偏向锁、轻量级锁或重量级锁等状态，目的是让低竞争时少阻塞、竞争激烈时再让线程进入等待；具体策略必须结合 JDK 版本说明。
 
-![synchronized 常见锁状态变化](../../../.image/interview/java/concurrency/synchronized-lock-upgrade.svg)
+![synchronized 常见锁状态变化](/.image/interview/java/concurrency/synchronized-lock-upgrade.svg)
 
 小白可以把它理解成排队方式逐渐变严格：一个人使用时只做简单登记；少量人竞争时先快速尝试；竞争持续时再进入真正的阻塞队列。
 
@@ -125,13 +125,33 @@ ThreadLocal 不是把对象复制一份，而是把值放进当前线程自己�
 
 以常见 JDK 8 实现为例，读取通常不加互斥锁，写入会结合 CAS 和桶级 synchronized。具体实现随 JDK 版本变化，面试时先讲“线程安全 + 更高并发度”。
 
-![ConcurrentHashMap 写入数据的简化流程](../../../.image/interview/java/concurrency/concurrenthashmap-put.svg)
+![ConcurrentHashMap 写入数据的简化流程](/.image/interview/java/concurrency/concurrenthashmap-put.svg)
 
 即使容器线程安全，多步业务逻辑也不一定原子。例如：
 
 ```java
 map.putIfAbsent(key, value); // 比 containsKey 后再 put 更适合并发场景
 ```
+
+#### 源码解析：`putVal` 先 CAS，再按桶同步
+
+以 [OpenJDK 21 `ConcurrentHashMap.putVal`](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java) 为例，它不会给整张表加一把大锁。关键路径可简化为：
+
+```text
+for (;;) {
+    if (table == null) initTable();
+    int i = (n - 1) & hash;
+    if (tabAt(table, i) == null) {
+        if (casTabAt(table, i, null, new Node<>(hash, key, value))) break;
+    } else if (节点表示正在扩容) {
+        helpTransfer(table, node); // 协助迁移
+    } else {
+        synchronized (node) { /* 只处理这个桶的链表或树 */ }
+    }
+}
+```
+
+读到这里应能解释三个现象：空桶写入竞争时由 CAS 决胜；同一桶冲突时才互斥，不同桶仍可并行；遇到转移标记的线程会帮助扩容而非全部阻塞。`get()` 的无锁读取依赖节点字段和数组访问的可见性设计，但多步业务操作仍需要 `compute`、`putIfAbsent` 或更高层同步来保证原子性。
 
 ### 11. AQS 是什么？
 
