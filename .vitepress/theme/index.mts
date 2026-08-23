@@ -88,7 +88,83 @@ export default {
     const route = useRoute();
     let activePhotoSwipe: PhotoSwipe | undefined;
     let contentElement: HTMLElement | undefined;
+    let outlineClassObserver: MutationObserver | undefined;
+    let outlineScrollFrame: number | undefined;
     let openRequestId = 0;
+
+    const syncActiveOutlineLink = () => {
+      outlineScrollFrame = undefined;
+
+      const activeLink = document.querySelector<HTMLAnchorElement>(
+        '.VPDocAsideOutline .outline-link.active'
+      );
+      const asideContainer = activeLink?.closest<HTMLElement>('.aside-container');
+
+      if (!activeLink || !asideContainer) {
+        return;
+      }
+
+      const linkBounds = activeLink.getBoundingClientRect();
+      const containerBounds = asideContainer.getBoundingClientRect();
+      const visibleTop = containerBounds.top + 16;
+      const visibleBottom = containerBounds.bottom - 48;
+
+      if (linkBounds.top >= visibleTop && linkBounds.bottom <= visibleBottom) {
+        return;
+      }
+
+      asideContainer.scrollBy({
+        behavior: 'auto',
+        top: linkBounds.top - containerBounds.top - asideContainer.clientHeight / 2
+      });
+    };
+
+    const scheduleOutlineSync = () => {
+      if (outlineScrollFrame !== undefined) {
+        return;
+      }
+
+      outlineScrollFrame = window.requestAnimationFrame(syncActiveOutlineLink);
+    };
+
+    const destroyOutlineSync = () => {
+      outlineClassObserver?.disconnect();
+      outlineClassObserver = undefined;
+
+      if (outlineScrollFrame !== undefined) {
+        window.cancelAnimationFrame(outlineScrollFrame);
+        outlineScrollFrame = undefined;
+      }
+    };
+
+    const refreshOutlineSync = () => {
+      destroyOutlineSync();
+
+      const outline = document.querySelector<HTMLElement>('.VPDocAsideOutline');
+
+      if (!outline) {
+        return;
+      }
+
+      outlineClassObserver = new MutationObserver((records) => {
+        if (
+          records.some(
+            (record) =>
+              record.target instanceof HTMLAnchorElement &&
+              record.target.classList.contains('outline-link')
+          )
+        ) {
+          scheduleOutlineSync();
+        }
+      });
+      outlineClassObserver.observe(outline, {
+        attributeFilter: ['class'],
+        attributes: true,
+        subtree: true
+      });
+
+      scheduleOutlineSync();
+    };
 
     const destroyImageViewer = () => {
       openRequestId += 1;
@@ -228,13 +304,25 @@ export default {
       contentElement.addEventListener('click', handleImageClick);
     };
 
-    onMounted(refreshImageViewer);
+    onMounted(() => {
+      refreshImageViewer();
+      refreshOutlineSync();
+      window.addEventListener('resize', scheduleOutlineSync);
+    });
 
     watch(
       () => route.path,
-      () => nextTick(refreshImageViewer)
+      () =>
+        nextTick(() => {
+          refreshImageViewer();
+          refreshOutlineSync();
+        })
     );
 
-    onUnmounted(destroyImageViewer);
+    onUnmounted(() => {
+      window.removeEventListener('resize', scheduleOutlineSync);
+      destroyOutlineSync();
+      destroyImageViewer();
+    });
   },
 };
