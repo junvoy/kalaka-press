@@ -174,6 +174,37 @@ html:not(.dark) .vp-code span {
     }
 }
 
+/* Article metadata: visually separated from the title and opening paragraph. */
+.vp-doc .page-reading-time {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--vp-c-divider);
+    color: var(--vp-c-text-2);
+    font-size: 13px;
+    line-height: 20px;
+}
+
+.vp-doc .page-reading-time-icon {
+    width: 14px;
+    height: 14px;
+    background-color: var(--vp-c-text-3);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") no-repeat center / contain;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+
+.vp-doc .page-reading-time strong {
+    color: var(--vp-c-text-1);
+    font-weight: 600;
+}
+
+/* A separate floating button replaces the return-to-top entry inside mobile outline navigation. */
+.VPLocalNavOutlineDropdown .header {
+    display: none;
+}
+
 /* Career guide: retain VitePress conventions while strengthening long-form hierarchy. */
 .career-guide .vp-doc h1 {
     margin-bottom: 18px;
@@ -181,7 +212,8 @@ html:not(.dark) .vp-code span {
     letter-spacing: -0.035em;
 }
 
-.career-guide .vp-doc h1 + p {
+.career-guide .vp-doc h1 + p,
+.career-guide .vp-doc .page-reading-time + p {
     color: var(--vp-c-text-2);
     font-size: 17px;
     line-height: 1.85;
@@ -237,7 +269,8 @@ html:not(.dark) .vp-code span {
 }
 
 @media (max-width: 640px) {
-    .career-guide .vp-doc h1 + p {
+    .career-guide .vp-doc h1 + p,
+    .career-guide .vp-doc .page-reading-time + p {
         font-size: 15px;
     }
 
