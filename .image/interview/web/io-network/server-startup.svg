@@ -1,5 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="250" viewBox="0 0 1040 250" content="&lt;mxfile host=&quot;draw.io&quot;&gt;&lt;diagram name=&quot;Server startup&quot;&gt;&lt;mxGraphModel&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;a&quot; value=&quot;应用调用 bind&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;25&quot; y=&quot;95&quot; width=&quot;150&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b&quot; value=&quot;创建并初始化 Server Channel&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;235&quot; y=&quot;95&quot; width=&quot;190&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;c&quot; value=&quot;注册到 Boss EventLoop&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;485&quot; y=&quot;95&quot; width=&quot;180&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;d&quot; value=&quot;绑定端口&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;725&quot; y=&quot;95&quot; width=&quot;120&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;e&quot; value=&quot;开始监听&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;895&quot; y=&quot;95&quot; width=&quot;120&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
+<svg style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns="http://www.w3.org/2000/svg" width="1040" height="250" viewBox="0 0 1040 250" content="&lt;mxfile host=&quot;draw.io&quot;&gt;&lt;diagram name=&quot;Server startup&quot;&gt;&lt;mxGraphModel adaptiveColors=&quot;auto&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;a&quot; value=&quot;应用调用 bind&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;25&quot; y=&quot;95&quot; width=&quot;150&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b&quot; value=&quot;创建并初始化 Server Channel&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;235&quot; y=&quot;95&quot; width=&quot;190&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;c&quot; value=&quot;注册到 Boss EventLoop&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;485&quot; y=&quot;95&quot; width=&quot;180&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;d&quot; value=&quot;绑定端口&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;725&quot; y=&quot;95&quot; width=&quot;120&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;e&quot; value=&quot;开始监听&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;895&quot; y=&quot;95&quot; width=&quot;120&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
+  <style>
+    [fill="#eef2ff"] { fill: light-dark(#eef2ff, #1a1d28); }
+    [fill="#fff7ed"] { fill: light-dark(#fff7ed, #33261d); }
+    [fill="#ecfeff"] { fill: light-dark(#ecfeff, #172a31); }
+    [fill="#f0fdf4"] { fill: light-dark(#f0fdf4, #18281d); }
+    [fill="#fef2f2"] { fill: light-dark(#fef2f2, #2e1b1b); }
+    [fill="#6366f1"] { fill: light-dark(#6366f1, #8285fc); }
+    [fill="#ea580c"] { fill: light-dark(#ea580c, #fb923c); }
+    [fill="#0891b2"] { fill: light-dark(#0891b2, #22d3ee); }
+    [fill="#16a34a"] { fill: light-dark(#16a34a, #4ade80); }
+    [fill="#dc2626"] { fill: light-dark(#dc2626, #f87171); }
+    [fill="#334155"] { fill: light-dark(#334155, #cbd5e1); }
+    [fill="#1e1b4b"] { fill: light-dark(#1e1b4b, #e0e7ff); }
+    [fill="#0f172a"] { fill: light-dark(#0f172a, #e2e8f0); }
+    [fill="#7c2d12"] { fill: light-dark(#7c2d12, #fed7aa); }
+    [fill="#0f766e"] { fill: light-dark(#0f766e, #99f6e4); }
+    [fill="#c2410c"] { fill: light-dark(#c2410c, #fdba74); }
+    [stroke="#6366f1"] { stroke: light-dark(#6366f1, #8285fc); }
+    [stroke="#ea580c"] { stroke: light-dark(#ea580c, #fb923c); }
+    [stroke="#0891b2"] { stroke: light-dark(#0891b2, #22d3ee); }
+    [stroke="#16a34a"] { stroke: light-dark(#16a34a, #4ade80); }
+    [stroke="#dc2626"] { stroke: light-dark(#dc2626, #f87171); }
+    [stroke="#334155"] { stroke: light-dark(#334155, #cbd5e1); }
+  </style>
   <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#6366f1"/></marker></defs>
   <text x="520" y="38" text-anchor="middle" font-family="Arial, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#1e1b4b">服务端启动：先注册，后绑定</text>
   <g fill="none" stroke="#6366f1" stroke-width="2" marker-end="url(#arrow)"><path d="M175 122H235"/><path d="M425 122H485"/><path d="M665 122H725"/><path d="M845 122H895"/></g>
