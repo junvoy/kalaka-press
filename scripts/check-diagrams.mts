@@ -34,6 +34,48 @@ function isWithin(directory: string, filePath: string): boolean {
     && !isAbsolute(relativePath);
 }
 
+function hasFixedWhiteCanvas(svg: string): boolean {
+  const viewBox = svg.match(/<svg\b[^>]*\bviewBox="([^"]+)"/)?.[1]
+    ?.split(/\s+/)
+    .map(Number);
+
+  if (!viewBox || viewBox.length !== 4 || viewBox.some(Number.isNaN)) {
+    return false;
+  }
+
+  const [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight] = viewBox;
+
+  return Array.from(svg.matchAll(/<rect\b[^>]*>/gi)).some(([rect]) => {
+    const fill = (
+      rect.match(/\bfill="([^"]+)"/)?.[1]
+      ?? rect.match(/\bstyle="[^"]*\bfill:\s*([^;"]+)/i)?.[1]
+    )?.trim().toLowerCase();
+    const x = Number(rect.match(/\bx="([^"]+)"/)?.[1] ?? 0);
+    const y = Number(rect.match(/\by="([^"]+)"/)?.[1] ?? 0);
+    const width = rect.match(/\bwidth="([^"]+)"/)?.[1];
+    const height = rect.match(/\bheight="([^"]+)"/)?.[1];
+    const isWhite = fill === '#fff' || fill === '#ffffff' || fill === 'white';
+    const usesPercentSize = width === '100%' && height === '100%';
+    const matchesViewBox = x === viewBoxX
+      && y === viewBoxY
+      && Number(width) === viewBoxWidth
+      && Number(height) === viewBoxHeight;
+
+    return isWhite && (usesPercentSize || matchesViewBox);
+  });
+}
+
+function hasFixedRootBackground(svg: string): boolean {
+  const rootStyle = svg.match(/<svg\b[^>]*\bstyle="([^"]*)"/)?.[1] ?? '';
+
+  return rootStyle.split(';').some((declaration) => {
+    const [property, value] = declaration.split(':', 2).map((part) => part.trim().toLowerCase());
+    return (property === 'background' || property === 'background-color')
+      && value !== 'transparent'
+      && value !== 'none';
+  });
+}
+
 for (const markdownPath of walk(contentRoot, '.md')) {
   const markdown = readFileSync(markdownPath, 'utf8');
   const imagePattern = /!\[([^\]]*)\]\(([^)]+\.svg(?:[?#][^)]*)?)\)/g;
@@ -91,6 +133,22 @@ for (const svgPath of diagramFiles) {
 
   if (!/content="&lt;mxfile\b/.test(svg)) {
     errors.push(`${relativePath} 没有内嵌 draw.io 可编辑数据`);
+  }
+
+  if (!/color-scheme:\s*light dark/.test(svg)) {
+    errors.push(`${relativePath} 缺少 color-scheme: light dark，无法跟随站点主题切换`);
+  }
+
+  if (!/light-dark\(/.test(svg)) {
+    errors.push(`${relativePath} 缺少 light-dark() 自适应颜色`);
+  }
+
+  if (hasFixedWhiteCanvas(svg)) {
+    errors.push(`${relativePath} 包含覆盖整张图的固定白色画布`);
+  }
+
+  if (hasFixedRootBackground(svg)) {
+    errors.push(`${relativePath} 的 SVG 根节点使用了固定画布背景`);
   }
 
   if (size > maxSvgBytes) {

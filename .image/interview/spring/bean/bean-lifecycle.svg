@@ -1,6 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="250" viewBox="0 0 1160 250" content="&lt;mxfile host=&quot;draw.io&quot;&gt;&lt;diagram name=&quot;Bean lifecycle&quot;&gt;&lt;mxGraphModel&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;definition&quot; value=&quot;读取 Bean 定义&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#6366f1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;90&quot; width=&quot;140&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;instance&quot; value=&quot;实例化并注入依赖&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#6366f1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;210&quot; y=&quot;90&quot; width=&quot;170&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;post&quot; value=&quot;初始化回调与后置处理&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;440&quot; y=&quot;90&quot; width=&quot;200&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;use&quot; value=&quot;可供业务使用（可能是代理）&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#16a34a;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;700&quot; y=&quot;90&quot; width=&quot;220&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;destroy&quot; value=&quot;容器关闭后销毁回调&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#dc2626;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;970&quot; y=&quot;90&quot; width=&quot;170&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
-  <defs><marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#334155"/></marker></defs><rect width="1160" height="250" fill="#fff"/>
+<svg style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns="http://www.w3.org/2000/svg" width="1160" height="250" viewBox="0 0 1160 250" content="&lt;mxfile host=&quot;draw.io&quot;&gt;&lt;diagram name=&quot;Bean lifecycle&quot;&gt;&lt;mxGraphModel adaptiveColors=&quot;auto&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;definition&quot; value=&quot;读取 Bean 定义&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#6366f1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;90&quot; width=&quot;140&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;instance&quot; value=&quot;实例化并注入依赖&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#6366f1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;210&quot; y=&quot;90&quot; width=&quot;170&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;post&quot; value=&quot;初始化回调与后置处理&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;440&quot; y=&quot;90&quot; width=&quot;200&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;use&quot; value=&quot;可供业务使用（可能是代理）&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#16a34a;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;700&quot; y=&quot;90&quot; width=&quot;220&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;destroy&quot; value=&quot;容器关闭后销毁回调&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#dc2626;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;970&quot; y=&quot;90&quot; width=&quot;170&quot; height=&quot;54&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
+  <style>
+    [fill="#eef2ff"] { fill: light-dark(#eef2ff, #1a1d28); }
+    [fill="#fff7ed"] { fill: light-dark(#fff7ed, #33261d); }
+    [fill="#ecfeff"] { fill: light-dark(#ecfeff, #172a31); }
+    [fill="#f0fdf4"] { fill: light-dark(#f0fdf4, #18281d); }
+    [fill="#fef2f2"] { fill: light-dark(#fef2f2, #2e1b1b); }
+    [fill="#6366f1"] { fill: light-dark(#6366f1, #8285fc); }
+    [fill="#ea580c"] { fill: light-dark(#ea580c, #fb923c); }
+    [fill="#0891b2"] { fill: light-dark(#0891b2, #22d3ee); }
+    [fill="#16a34a"] { fill: light-dark(#16a34a, #4ade80); }
+    [fill="#dc2626"] { fill: light-dark(#dc2626, #f87171); }
+    [fill="#334155"] { fill: light-dark(#334155, #cbd5e1); }
+    [fill="#1e1b4b"] { fill: light-dark(#1e1b4b, #e0e7ff); }
+    [fill="#0f172a"] { fill: light-dark(#0f172a, #e2e8f0); }
+    [fill="#7c2d12"] { fill: light-dark(#7c2d12, #fed7aa); }
+    [fill="#0f766e"] { fill: light-dark(#0f766e, #99f6e4); }
+    [fill="#c2410c"] { fill: light-dark(#c2410c, #fdba74); }
+    [stroke="#6366f1"] { stroke: light-dark(#6366f1, #8285fc); }
+    [stroke="#ea580c"] { stroke: light-dark(#ea580c, #fb923c); }
+    [stroke="#0891b2"] { stroke: light-dark(#0891b2, #22d3ee); }
+    [stroke="#16a34a"] { stroke: light-dark(#16a34a, #4ade80); }
+    [stroke="#dc2626"] { stroke: light-dark(#dc2626, #f87171); }
+    [stroke="#334155"] { stroke: light-dark(#334155, #cbd5e1); }
+  </style>
+  <defs><marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#334155"/></marker></defs>
   <g font-family="Arial, PingFang SC, sans-serif" font-size="16" text-anchor="middle" fill="#0f172a" stroke-width="2">
     <rect x="20" y="98" width="150" height="54" rx="8" fill="#eef2ff" stroke="#6366f1"/><text x="95" y="131" stroke="none">读取 Bean 定义</text><path d="M170 125H210" fill="none" stroke="#334155" marker-end="url(#arrow)"/>
     <rect x="220" y="98" width="170" height="54" rx="8" fill="#eef2ff" stroke="#6366f1"/><text x="305" y="131" stroke="none">实例化并注入依赖</text><path d="M390 125H440" fill="none" stroke="#334155" marker-end="url(#arrow)"/>

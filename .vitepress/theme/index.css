@@ -56,19 +56,19 @@ html:not(.dark) .vp-code span {
 }
 
 .pswp {
-    --pswp-bg: #fff;
-    --pswp-placeholder-bg: #fff;
-    --pswp-icon-color: #25272d;
-    --pswp-icon-color-secondary: #fff;
-    --pswp-icon-stroke-color: #fff;
-    --pswp-error-text-color: #25272d;
-    --pswp-preloader-color: rgb(37 39 45 / 35%);
-    --pswp-preloader-color-secondary: rgb(37 39 45 / 80%);
+    --pswp-bg: var(--vp-c-bg);
+    --pswp-placeholder-bg: var(--vp-c-bg-soft);
+    --pswp-icon-color: var(--vp-c-text-1);
+    --pswp-icon-color-secondary: var(--vp-c-bg);
+    --pswp-icon-stroke-color: var(--vp-c-bg);
+    --pswp-error-text-color: var(--vp-c-text-1);
+    --pswp-preloader-color: var(--vp-c-text-3);
+    --pswp-preloader-color-secondary: var(--vp-c-text-1);
 }
 
 .pswp__top-bar {
     padding: 8px 12px;
-    background: linear-gradient(to bottom, rgb(255 255 255 / 96%), transparent);
+    background: linear-gradient(to bottom, var(--vp-c-bg), transparent);
 }
 
 .pswp__button {
@@ -79,7 +79,7 @@ html:not(.dark) .vp-code span {
 }
 
 .pswp__button:hover {
-    background: rgb(37 39 45 / 8%);
+    background: var(--vp-c-default-soft);
 }
 
 .pswp__button:active {
@@ -89,7 +89,7 @@ html:not(.dark) .vp-code span {
 .pswp__counter {
     height: 48px;
     padding: 0 14px;
-    color: rgb(37 39 45 / 78%);
+    color: var(--vp-c-text-2);
     font-size: 14px;
     line-height: 48px;
     text-shadow: none;
@@ -103,11 +103,11 @@ html:not(.dark) .vp-code span {
     max-width: min(720px, calc(100% - 32px));
     padding: 8px 14px;
     transform: translateX(-50%);
-    border: 1px solid rgb(37 39 45 / 10%);
+    border: 1px solid var(--vp-c-divider);
     border-radius: 999px;
-    background: rgb(255 255 255 / 88%);
-    box-shadow: 0 8px 28px rgb(15 23 42 / 10%);
-    color: rgb(37 39 45 / 88%);
+    background: var(--vp-c-bg-soft);
+    box-shadow: var(--vp-shadow-3);
+    color: var(--vp-c-text-1);
     font-size: 14px;
     line-height: 1.5;
     text-align: center;
