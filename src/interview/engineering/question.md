@@ -84,4 +84,4 @@ Java I/O 的 `BufferedInputStream` 是装饰器的常见例子；Spring AOP 代�
 
 ---
 
-[← 分布式系统](../distributed/question) · [返回技术架构目录](../question)
+[← 分布式系统](../distributed/question) · [返回第一性原理学习地图](../question)
