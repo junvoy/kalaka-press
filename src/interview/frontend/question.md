@@ -40,4 +40,4 @@ outline: [2, 3]
 
 ---
 
-[← 可观测性与交付](../operations/question) · [返回技术架构目录](../question)
+[← 可观测性与交付](../operations/question) · [返回第一性原理学习地图](../question)

@@ -1,6 +1,8 @@
 # 葵花宝典
 
-这里用尽量直白的语言讲清 Java 后端面试知识。内容按技术架构划分，每道题先给出可以直接回答面试官的结论，再用生活化例子和代码解释原因。
+这里用尽量直白的语言讲清后端系统原理与工程实践。学习采用第一性原理：不从“别人都怎么做”或“这道题怎么背”开始，而是先质疑现成答案，把问题拆成可验证的基本事实与硬约束，再从这些事实重新构造机制。
+
+面试题仍然保留，但它是章节末尾的理解检查：真正掌握一个主题，应该能够解释它为什么存在、在什么条件下成立、付出了什么代价，以及失败后如何恢复。
 
 ## 推荐学习顺序
 
@@ -11,14 +13,15 @@
 5. 再扩展 Web 与网络、Spring、数据访问，掌握服务如何接收请求、组织业务和读写数据。
 6. 最后进入缓存、消息队列、分布式系统和工程化，形成完整后端框架。
 
-## 先看全局地图
+## 两种学习入口
 
-- [后端技术地图与学习路径](/src/interview/question)
-- [面试题内容编写规范](/src/interview/content-guide)
+- [第一性原理学习地图](/src/interview/question)：从数据、执行、通信、状态、一致性和可靠性等基本事实重新构造系统认识。
+- [技术索引](/src/interview/technology-index)：已经知道要查 Java、Spring、MySQL 或 MQ 时，从具体技术快速进入。
+- [第一性原理内容规范](/src/interview/content-guide)：了解本站怎样拆解假设、确认基本事实并重新构造结论。
 
 ## Java 核心
 
-- [Java 核心面试题学习目录（小白版）](/src/interview/java/question)
+- [Java 核心学习目录（小白版）](/src/interview/java/question)
   - [Java 基础](/src/interview/java/basic)
   - [Java 集合](/src/interview/java/collections)
   - [并发](/src/interview/java/concurrency)
@@ -39,8 +42,8 @@
 
 ## 数据存储与缓存
 
-- [MySQL 面试题](/src/interview/mysql/question)
-- [Redis 面试题](/src/interview/redis/question)
+- [MySQL](/src/interview/mysql/question)
+- [Redis](/src/interview/redis/question)
 
 ## 消息与系统集成
 

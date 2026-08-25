@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "云程阁",
-  description: "Java、AI 面试与求职成长知识库",
+  description: "Java、AI Agent 与软件系统原理知识库",
   // 源路径·
   srcDir: '.',
   // base URL
@@ -40,8 +40,9 @@ export default defineConfig({
           text: '学习总览',
           collapsed: false,
           items: [
-            { text: '后端技术地图与学习路径', link: '/src/interview/question' },
-            { text: '面试题内容编写规范', link: '/src/interview/content-guide' }
+            { text: '第一性原理学习地图', link: '/src/interview/question' },
+            { text: '技术索引', link: '/src/interview/technology-index' },
+            { text: '第一性原理内容规范', link: '/src/interview/content-guide' }
           ]
         },
         {

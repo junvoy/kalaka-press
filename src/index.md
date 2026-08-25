@@ -4,24 +4,24 @@ layout: home
 
 hero:
   name: "云程阁"
-  text: "Java · AI Agent · 求职成长"
-  tagline: 记录技术实践、面试准备与持续复盘
+  text: "Java · AI Agent · 软件系统原理"
+  tagline: 用第一性原理、源码与工程实践建立可迁移的技术理解
   actions:
     - theme: brand
-      text: 开始求职准备
-      link: /src/career/
+      text: 开始第一性原理学习
+      link: /src/interview/question
     - theme: alt
-      text: 查看网页简历
-      link: /src/resume/
+      text: 查看技术索引
+      link: /src/interview/technology-index
 
 features:
   - title: 葵花宝典
     icon: 📚
-    details: Java 后端、数据库与高并发核心知识
+    details: 后端系统原理与工程实践
     link: /src/interview/introduction
   - title: 天机秘卷
     icon: ✨
-    details: AI Agent、大模型应用与工程化面试题
+    details: AI 系统原理与可控工程
     link: /src/interview/ai/
   - title: 青云策
     icon: 🧭
