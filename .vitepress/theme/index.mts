@@ -5,6 +5,7 @@ import type PhotoSwipe from 'photoswipe';
 import type { SlideData } from 'photoswipe';
 import 'photoswipe/style.css';
 
+import Layout from './Layout.vue';
 import './index.css';
 
 const CONTENT_SELECTOR = '.vp-doc';
@@ -83,6 +84,7 @@ const createSlideData = async (
 
 export default {
   ...DefaultTheme,
+  Layout,
 
   setup() {
     const route = useRoute();

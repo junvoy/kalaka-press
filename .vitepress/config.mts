@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitepress'
 
+import { pageReadingTime } from './markdown/page-reading-time.mjs'
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "云程阁",
@@ -13,6 +15,9 @@ export default defineConfig({
   // 删除 .html 后缀
   cleanUrls: true,
   markdown: {
+    config(md) {
+      pageReadingTime(md)
+    },
     image: {
       // 默认禁用；设置为 true 可为所有图片启用懒加载。
       lazyLoading: true
