@@ -2,153 +2,204 @@
 outline: [2, 3]
 ---
 
-# Java 集合：从操作约束推导数据结构
+# Java 集合：List、Set 和 Map 怎么选？
 
-集合不是一张需要背诵的类名表，而是在有限时间和内存中组织一批对象的办法。选择 ArrayList、HashMap 或 TreeMap 之前，先问数据要支持哪些操作、必须保持什么顺序，以及是否存在并发修改。
+写业务代码时，我们通常不是在“选择一个集合类”，而是在回答三个问题：数据要不要保持顺序？能不能重复？主要按下标访问，还是按 Key 查找？
 
-## 目标：不预设集合类型
+本章先给出能直接用于编码的选择方法，再用数组、链表、哈希表和树解释原因。第一次阅读可以只看每题开头的“直接回答”和代码示例；需要准备面试或排查性能问题时，再继续阅读机制与边界。
 
-先不问“应该用 ArrayList 还是 HashMap”。真正的目标是：订单系统要保存一批订单，页面能按顺序展示，回调能按订单号定位，运营能按时间范围查询，并且所有操作在给定数据规模和并发条件下保持正确。
+## 先用起来：按需求选择
 
-只有目标明确后，才能判断是否需要数组、哈希表或树。一个结构很难同时把下标访问、任意插入、Key 查询、范围扫描和并发写入都做到最低成本，因此最终方案必须说明主要操作与愿意承担的代价。
+- **保持先后顺序，允许重复：** `ArrayList`，例如商品列表、查询结果。
+- **不允许重复：** `HashSet`，例如已处理订单号。
+- **根据 Key 快速查找 Value：** `HashMap`，例如“订单号 → 订单”。
+- **保持插入顺序或访问顺序：** `LinkedHashMap`，例如固定顺序展示、LRU 缓存。
+- **按 Key 排序、做范围查询：** `TreeMap`，例如时间区间、排行榜。
+- **从队头取、从队尾放：** `ArrayDeque`，例如 BFS、普通任务队列。
+- **多线程并发读写 Map：** `ConcurrentHashMap`，例如本地并发缓存。
+- **读很多、写很少的并发 List：** `CopyOnWriteArrayList`，例如监听器列表。
 
-学完本章，应能做到：
+这张表是起点，不是结论。数据规模、读写比例、顺序要求和并发边界变化后，选择也可能变化。
 
-- 从访问、插入、去重、排序和并发需求推导集合类型，而不是按习惯选型。
-- 解释数组、链表、哈希表和树为什么具有不同的时间与空间特征。
-- 说明 `equals()`、`hashCode()`、比较器和可变性怎样影响集合正确性。
-- 从 OpenJDK 21 源码验证 ArrayList 扩容和 HashMap 写入的关键机制。
+## 集合的三个基本角色
 
-## 拆掉现成答案
+### 1. List、Set 和 Map 有什么区别？
 
-### 哪些是事实，哪些只是惯例？
+**直接回答：** `List` 保存一串有位置的数据，允许重复；`Set` 保存不重复的元素；`Map` 保存 Key 到 Value 的映射，并要求 Key 唯一。
 
-| 常见说法 | 分类 | 为什么 |
-| --- | --- | --- |
-| “业务代码默认用 ArrayList” | 惯例 | 只有访问模式和数据规模匹配时才合理 |
-| “LinkedList 增删一定更快” | 错误假设 | 如果没有节点引用，仍要先进行 O(n) 定位 |
-| “HashMap 查询就是 O(1)” | 带条件结论 | 依赖哈希分布、负载和冲突控制，只能描述常见平均情况 |
-| “Set 会自动识别业务重复” | 错误假设 | 去重语义来自 `equals()`、`hashCode()` 或比较器 |
-| “线程安全集合让整段业务原子化” | 错误假设 | 单方法安全不能覆盖多步业务不变量 |
+```java
+List<String> steps = new ArrayList<>();
+steps.add("支付");
+steps.add("支付");                 // 允许重复，位置分别是 0 和 1
 
-如果直接从这些类名和口号出发，得到的只是类比式选型。第一性推导要继续向下拆解。
+Set<String> paidOrders = new HashSet<>();
+paidOrders.add("order-1001");
+paidOrders.add("order-1001");     // 第二次不会增加新元素
 
-### 不可再省略的基本事实
+Map<String, Integer> stock = new HashMap<>();
+stock.put("book", 10);
+stock.put("book", 8);             // 同一个 Key 更新为 8
+```
 
-- 计算机只能通过地址读取内存；连续位置可以由起点和偏移量直接定位。
-- 数组长度固定，想容纳更多元素必须重新分配空间并迁移数据。
-- 不保存额外索引时，按值或 Key 查找只能逐个比较。
-- 哈希值的取值空间有限，不同 Key 可能冲突；最终相等性不能只靠 hash 判断。
-- 排序和范围查询要求元素之间存在稳定、可传递的顺序关系。
-- 多线程共享可变结构时，读写步骤可能交错；线程安全必须明确原子边界和可见性。
+三者保护的是不同规则：
 
-在这些事实之上，再看不同操作需要什么最小结构：
+- `List` 关心“第几个”，所以要保留元素的顺序和位置。
+- `Set` 关心“是否已经存在”，所以必须有判断相等的规则。
+- `Map` 关心“这个 Key 对应什么”，所以需要从 Key 定位到 Value。
 
-| 主要需求 | 最小结构直觉 | 常见 Java 实现 | 需要接受的代价 |
-| --- | --- | --- | --- |
-| 按下标快速访问 | 连续位置 | `ArrayList` | 中间插入、删除需要移动元素 |
-| 已持有节点时快速连接或断开 | 节点和指针 | `LinkedList` | 定位第 n 个元素仍要遍历，节点有额外内存 |
-| 按 Key 快速定位 | 桶数组 + 哈希 | `HashMap` | 不保证排序，依赖稳定的相等性规则 |
-| 去重 | 只保留唯一 Key | `HashSet` | 与 HashMap 一样依赖 `hashCode()` 和 `equals()` |
-| 按 Key 排序或范围查询 | 有序树 | `TreeMap` | 查找通常为 O(log n)，比较规则必须一致 |
-| 先进先出或两端操作 | 队头与队尾 | `ArrayDeque` | 不支持按任意下标高效访问 |
+如果既要去重又要保持插入顺序，可以使用 `LinkedHashSet`；如果既要映射又要按 Key 排序，可以使用 `TreeMap`。不存在一个集合能以最低成本满足所有需求。
 
-复杂度描述的是数据规模增长时的趋势，不是一次操作必然花费的固定时间。连续内存的局部性、对象分配、冲突分布和扩容频率都会影响实际表现，因此不能只凭一张 O(1)/O(n) 表下结论。
+## List：为什么通常先选 ArrayList？
 
-### 目标不变量
+### 2. ArrayList 和 LinkedList 有什么区别？
 
-- `List` 必须保留元素的序列位置，允许相同元素重复出现。
-- `Set` 必须让同一相等性规则下的元素最多出现一次。
-- `Map` 必须让一个 Key 在同一时刻只映射一个 Value。
-- 有序集合的比较关系必须稳定且具有传递性，否则“放在哪里”和“是否相同”都会失去确定含义。
-- 遍历期间如果结构被修改，迭代器必须定义自己看到的是原状态、新状态、快照，还是直接报告冲突。
+**直接回答：** 不确定选哪个时，通常先选 `ArrayList`。它按下标访问快、内存更紧凑；`LinkedList` 只有在已经定位到节点并频繁在附近插入删除时，才可能省去数组搬移，但它查找第 n 个元素仍需遍历。
 
-## 从基本事实重新构造
+两者最核心的区别不是 API，而是数据怎样放进内存：
 
-假设 Java Collections Framework 尚不存在，只根据上面的事实重新设计：需要下标定位，就必须保留连续位置或等价索引；需要按 Key 缩小搜索范围，就必须增加从 Key 到位置的映射；需要范围查询，就必须保存顺序；需要并发快照，就必须隔离写入或复制版本。ArrayList、HashMap、TreeMap 和 CopyOnWriteArrayList 是这些推导的具体实现，而不是推理起点。
+```text
+ArrayList:  [A][B][C][D]        连续的引用数组
+LinkedList: [A] <-> [B] <-> [C] 每个节点还保存前后指针
+```
 
-### 连续数组：用搬移成本换随机访问
+- **按下标读取：** `ArrayList` 是 O(1)，`LinkedList` 是 O(n)。数组可按下标定位，链表要逐个走节点。
+- **尾部追加：** 两者通常都是 O(1)，但 ArrayList 偶尔需要扩容，LinkedList 每次需要创建节点。
+- **中间插入、删除：** ArrayList 定位快但要搬移后续元素；LinkedList 改链接只需 O(1)，但通常先要花 O(n) 找到位置。
+- **内存与缓存局部性：** ArrayList 通常更好；LinkedList 的每个节点还要保存前后引用，节点也可能分散在内存中。
 
-如果元素连续存放，并且每个位置都能用 `起始地址 + 下标` 定位，那么按下标访问不需要从头遍历。这就是 ArrayList 适合随机访问、CPU 也容易利用内存局部性的原因。
+“链表增删是 O(1)”省略了一个关键条件：代码已经持有目标节点。`LinkedList.remove(index)` 先找节点，整体仍是 O(n)。如果只是需要队头、队尾操作，通常直接使用 `ArrayDeque`，语义也更清楚。
 
-连续数组的容量不能原地无限增长。空间不足时只能申请更大的数组，再复制已有元素：
+### 3. ArrayList 是怎样扩容的？
+
+**直接回答：** `ArrayList` 的底层数组放不下新元素时，会申请一个更大的数组，把旧元素复制过去，再加入新元素。JDK 21 中，常见扩容结果约为旧容量的 1.5 倍；这是实现细节，不是 `List` 接口的保证。
 
 ![ArrayList 添加元素和扩容流程](/.image/interview/java/collections/arraylist-grow.svg)
 
-OpenJDK 21 的 `ArrayList` 在追加前会检查数组是否有空间；需要增长时，[`ArrayList.grow`](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java) 计算新容量并通过数组复制迁移元素。常见增长结果约为旧容量的 1.5 倍，但这是实现策略，不是动态数组的永恒定义。
+数组长度创建后不能改变，因此“扩容”并不是把原数组拉长，而是搬家：
 
-由此可以推导出三条工程结论：
+```text
+旧数组 [A][B][C]        容量不足
+          ↓ 申请并复制
+新数组 [A][B][C][ ][ ]  再写入 D
+```
 
-1. 普通追加通常便宜，触发扩容的那次追加需要分配和复制。
-2. 已知大致规模时预设容量可以减少搬家次数，但过度预留会浪费内存。
-3. 中间插入与删除需要移动后续元素；LinkedList 只有在已经拿到节点时才省掉搬移，按下标找节点仍是 O(n)。
+在固定的 [OpenJDK 21 `ArrayList`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/ArrayList.java) 实现中，默认构造的空列表第一次添加元素时会获得默认容量 10，后续增长通常以旧容量的一半作为优先增长量。由此得到几个实用结论：
 
-### 哈希表：用额外空间换按 Key 定位
+- 尾部追加的平均成本低，但触发扩容的那一次需要分配数组和复制元素。
+- 已知大致数量时，`new ArrayList<>(expectedSize)` 可以减少扩容；估得过大则会浪费空间。
+- `size` 是已经保存的元素数量，`capacity` 是底层数组当前能容纳的数量，两者不是一回事。
 
-如果只靠线性扫描找 Key，数据越多，平均需要比较的元素越多。哈希表先把 Key 变成整数，再把整数映射到桶下标，把全量搜索缩小为桶内搜索。
+最小实验：把初始容量设为 2，再加入 3 个元素，在 `ArrayList.grow` 处打断点，就能观察第三次添加触发新数组分配。
 
-最小模型只有三步：
+## HashMap 与 HashSet：Key 为什么能快速定位？
 
-1. `hashCode()` 产生哈希值。
-2. 哈希值和数组长度共同确定桶位置。
-3. 桶内再用 `equals()` 判断是否为同一个 Key。
+### 4. HashMap 的底层原理是什么？
 
-不同 Key 可能落入同一桶，这叫哈希冲突。冲突不能被“消灭”，只能通过良好的哈希分布、扩容和桶内结构控制查找成本。
+**直接回答：** `HashMap` 先根据 Key 的 `hashCode()` 计算桶位置，再在桶内用 `equals()` 找到真正相等的 Key。JDK 21 的桶底层是数组；发生哈希冲突时，同一桶中的节点会组织成链表，满足条件后可转换为红黑树。
+
+先看一次 `put(key, value)` 做了什么：
+
+1. 把 Key 的 hash 映射为数组下标，先缩小搜索范围。
+2. 桶为空就直接放入；桶不为空则逐个比较 hash 和 Key。
+3. 找到相同 Key 就更新 Value，否则追加新节点。
+4. 元素太多时扩容；单桶过长且数组容量足够时，把链表树化。
 
 ![HashMap 数组、链表和红黑树结构](/.image/interview/java/collections/hashmap-structure.svg)
 
 ![HashMap 写入数据的简化流程](/.image/interview/java/collections/hashmap-put-flow.svg)
 
-#### OpenJDK 21 怎样实现写入？
+这里有两个容易混淆的判断：
 
-以 [OpenJDK 21 `HashMap.putVal`](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java) 为验证入口，关键分支可以压缩为：
+```java
+// 示意代码，不是 JDK 原样源码
+int bucketIndex = spread(key.hashCode()) & (table.length - 1);
 
-```text
-没有桶数组                       -> resize() 初始化
-目标桶为空                       -> 直接放入新节点
-hash 与 key 都匹配                -> 更新旧节点
-目标桶是树                       -> putTreeVal(...)
-目标桶是链表且没有相同 key        -> 追加；满足条件时 treeifyBin(...)
-写入后 size 超过 threshold        -> resize()
+if (storedHash == hash && Objects.equals(storedKey, key)) {
+    // 才能认定是同一个 Key
+}
 ```
 
-数组容量为 2 的幂时，`(n - 1) & hash` 可以高效计算下标；扩容到两倍时，节点也能根据新增的一位判断留在原桶还是移动到“原下标 + 旧容量”。这是 Java HashMap 的实现选择，不代表所有哈希表都必须使用 2 的幂。
+hash 相同不代表对象相等，因为有限的整数范围要对应大量可能对象，冲突一定可能发生。`hashCode()` 负责快速缩小范围，`equals()` 负责最终确认。
 
-在 OpenJDK 21 中，链表达到树化阈值且数组容量至少为 64 时才会转成红黑树；容量较小时优先扩容。阈值属于版本实现，稳定原理是：当单个桶退化得过长时，需要限制桶内查找的最坏成本。
+在 [OpenJDK 21 `HashMap.putVal`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/HashMap.java) 中，树化阈值为 8，但数组容量小于 64 时优先扩容。具体数字属于 JDK 21 的实现策略；稳定原理是通过扩容改善分布，并限制单桶退化后的查找成本。
 
-### 相等性：哈希集合正确性的根基
+### 5. HashMap 为什么把容量设计成 2 的幂？
 
-HashSet 复用 HashMap，把元素放在 Key 的位置。于是“能否去重”不由 Set 这个名字自动保证，而取决于对象是否提供一致、稳定的相等性规则：
+**直接回答：** 在 JDK 21 的 `HashMap` 实现中，容量保持为 2 的幂，可以用 `(capacity - 1) & hash` 计算桶下标；扩容为两倍时，节点只需根据新增的一个二进制位决定留在原位置，还是移动到“原下标 + 旧容量”。
 
-- `equals()` 相等的两个对象必须拥有相同 `hashCode()`。
-- 对象放入 HashMap 或 HashSet 后，参与哈希与相等判断的字段不应改变。
-- 只比较 hash 不足以确认相等，因为不同对象可能发生冲突。
+以容量 16 为例，`capacity - 1` 是二进制 `1111`，按位与会保留 hash 的低 4 位，结果自然落在 0～15：
 
-如果 Key 入集合后被修改，它的新 hash 可能指向另一个桶，而对象实际还留在旧桶中。此时 `contains` 或 `remove` 找不到它，并不是集合“随机坏了”，而是 Key 破坏了定位不变量。业务 Key 优先使用不可变对象。
+```text
+hash:          ... 10110110
+capacity - 1:      00001111
+结果:              00000110  -> 桶下标 6
+```
 
-### 有序结构：顺序必须有明确来源
+容量从 16 扩到 32 时，多参与计算的只有下一位。旧节点因此只有两种去向，不必重新做通用取模运算。
 
-哈希结构只关心快速定位，不承诺遍历顺序。增加顺序要求后，需要额外结构：
+“容量必须是 2 的幂”不是所有哈希表的第一原则，而是 Java `HashMap` 为下标计算和扩容迁移做出的实现选择。真正不变的要求是：桶下标必须合法，且 Key 要尽可能均匀分布。
 
-| 实现 | 顺序从哪里来 | 常见查找成本 | 适用场景 |
-| --- | --- | --- | --- |
-| `HashMap` | 不保证 | 平均 O(1) | 普通 Key-Value 查询 |
-| `LinkedHashMap` | 额外双向链表维护插入或访问顺序 | 平均 O(1) | 稳定遍历、LRU 思路 |
-| `TreeMap` | 红黑树根据 Key 或比较器排序 | O(log n) | 排序、相邻和范围查询 |
+### 6. HashMap、Hashtable 和 ConcurrentHashMap 怎么选？
 
-`Comparable` 由类型定义一种自然顺序，`Comparator` 由调用方提供外部规则。比较器必须保持自反性、对称性和传递性，并避免用 `a - b` 比较整数造成溢出。TreeMap 主要根据比较结果判断 Key 是否相同；比较器若与 `equals()` 语义冲突，可能把两个业务上不同的 Key 当成同一个位置。
+**直接回答：** 单线程或线程隔离场景用 `HashMap`；多线程共享并读写时优先用 `ConcurrentHashMap`；新代码通常不再选择历史类 `Hashtable`。
 
-### 队列：限制访问方式换取清晰语义
+- **`HashMap`：** 不支持无保护的并发读写；允许一个 null Key 和多个 null Value；适合局部变量或外部已经同步的场景。
+- **`Hashtable`：** 单个方法使用 `synchronized`；Key 和 Value 都不允许 null；主要用于维护历史代码。
+- **`ConcurrentHashMap`：** 支持并发访问；Key 和 Value 都不允许 null；适合多线程共享 Map。
 
-Queue 强调先进先出；Deque 暴露两端，既能实现队列，也能实现栈。`ArrayDeque` 通常比旧的 `Stack` 更适合作为栈，并可使用 `offerLast()`/`pollFirst()` 表达队列。
+线程安全集合只保证其 API 定义的操作，不会自动让任意业务步骤变成一个原子操作。下面的代码即使用 `ConcurrentHashMap` 仍然存在“先查再写”的竞态：
 
-普通 ArrayDeque 不负责线程等待，也不允许 null，因为 `poll()` 返回 null 常被用来表达“队列为空”。需要生产者和消费者阻塞等待时，应选择具有容量与等待语义的 `BlockingQueue`，而不是把同步责任强加给普通容器。
+```java
+if (!cache.containsKey(key)) {
+    cache.put(key, load(key));
+}
+```
 
-## 共享、遍历与快照
+应该优先使用集合提供的复合操作：
 
-### 遍历必须定义修改可见性
+```java
+Value value = cache.computeIfAbsent(key, this::load);
+```
 
-普通集合的迭代器常使用 fail-fast 尽早暴露意外结构修改：发现修改计数不符合预期时，抛出 `ConcurrentModificationException`。它是错误检测机制，不是并发安全保证，也不承诺捕获每一次竞态。
+但 `computeIfAbsent` 的计算函数也要短小、避免递归更新同一 Map，并考虑加载失败和下游重复调用的边界。集合方法原子，不等于整个业务事务原子。
+
+### 7. HashSet 为什么能去重？
+
+**直接回答：** `HashSet` 内部使用 `HashMap` 保存元素：Set 的元素作为 Map 的 Key，Value 使用统一的占位对象。Map 的 Key 不能重复，所以 Set 能去重。
+
+去重是否符合业务预期，取决于元素的 `equals()` 和 `hashCode()`：
+
+```java
+record UserId(long value) {}
+
+Set<UserId> users = new HashSet<>();
+users.add(new UserId(1001));
+users.add(new UserId(1001));
+
+System.out.println(users.size()); // 1
+```
+
+必须遵守的契约是：两个对象如果 `equals()` 为 true，它们的 `hashCode()` 必须相同。反过来不成立，hash 相同仍可由 `equals()` 判断为不同对象。
+
+还有一个常见故障：元素放入 `HashSet` 后，又修改了参与 `equals()` 或 `hashCode()` 的字段。新 hash 可能指向另一个桶，而对象仍在旧桶中，`contains` 和 `remove` 就可能找不到它。因此，长期作为 HashMap Key 或 HashSet 元素的业务标识，优先使用不可变对象。
+
+## 遍历与排序：看得见的顺序从哪里来？
+
+### 8. 什么是 fail-fast？
+
+**直接回答：** fail-fast 是普通集合迭代器的一种错误检测机制：迭代期间发现集合发生了预期之外的结构修改，就尽快抛出 `ConcurrentModificationException`。它不是锁，也不是线程安全保证。
+
+下面的写法可能触发异常，因为集合自己删除元素后，迭代器记录的修改次数过期了：
+
+```java
+for (String name : names) {
+    if (name.isBlank()) {
+        names.remove(name); // 不要这样做
+    }
+}
+```
+
+需要在遍历中删除当前元素时，使用迭代器自己的 `remove()`：
 
 ```java
 Iterator<String> iterator = names.iterator();
@@ -159,109 +210,161 @@ while (iterator.hasNext()) {
 }
 ```
 
-增强 for 遍历 `Iterable` 时通常会编译为 Iterator；需要删除当前元素时使用迭代器自己的 `remove()`。数组也支持增强 for，但不经过 Iterator。
-
-### 线程安全不能只看单个方法
-
-普通场景使用 HashMap；并发读写使用 ConcurrentHashMap 等并发集合。即使 `get` 和 `put` 分别线程安全，“先判断不存在，再写入”仍是两个步骤，应使用 `putIfAbsent()` 或 `computeIfAbsent()` 等复合原子操作。
-
-CopyOnWriteArrayList 在写入时复制底层数组，让读者遍历创建迭代器时的稳定快照。它适合数据量不大、读远多于写的监听器或配置列表；写频繁时，复制、内存和垃圾回收成本都会放大。
-
-不可变集合与只读视图也不能混淆：`Collections.unmodifiableList(source)` 只阻止通过当前视图修改，持有 `source` 的代码仍能改变底层数据；需要独立快照时，可以在符合 null 等约束的前提下使用 `List.copyOf(source)`。
-
-## 验证与证伪
-
-第一性推导需要允许被实验推翻：
-
-- 给 ArrayList 设置很小的初始容量并连续追加，通过调试器或源码断点观察数组引用何时改变，验证“扩容需要新数组和复制”。
-- 构造一个把可变字段用于 `hashCode()` 的 Key，放入 HashSet 后修改字段，再执行 `contains`，验证相等性不稳定会破坏定位。
-- 比较 LinkedList “已经持有节点”和“按下标删除”两种路径，证伪“链表删除无条件 O(1)”的口号。
-- 创建 CopyOnWriteArrayList 迭代器后再写入，观察旧迭代器看不到新元素，验证它提供的是创建时快照。
-
-如果真实基准显示某个理论上更优的结构在目标数据规模下更慢，应回到缓存局部性、分配和数据分布重新检查假设，而不是维护原结论。
-
-## 工程取舍与失败边界
-
-- 不要根据“插入删除 O(1)”就默认选择 LinkedList；先把定位节点的成本和真实访问模式算进去。
-- 不要依赖 HashMap 遍历顺序；需要稳定顺序时，把顺序写进数据结构或显式排序。
-- 不要让可变业务对象直接充当长期 Key，除非哈希与相等字段在生命周期内稳定。
-- 不要把 ConcurrentHashMap 的单方法安全扩大为任意业务流程原子性。
-- 不要把 CopyOnWriteArrayList 用在高频写入或大元素集合中；它优化的是读快照，不是通用并发性能。
-- 性能敏感选型应使用接近真实数据规模、分布和读写比例的基准验证，不能只比较理论复杂度。
-
-## 理解自测与面试表达
-
-下面保留原有问题标题以兼容旧链接。回答时先指出题目里的隐藏假设，再列出基本事实并重新推导，不能从集合类名直接开始。
-
-### 1. List、Set 和 Map 有什么区别？
-
-检查点：它们分别保护什么不变量？如果既要去重又要保持插入顺序，还需要增加什么结构？
-
-### 2. ArrayList 和 LinkedList 有什么区别？
-
-检查点：除了复杂度，连续内存、节点定位和对象开销会怎样改变真实选择？
-
-### 3. ArrayList 是怎样扩容的？
-
-检查点：为什么扩容不能原地完成？预设容量在哪些情况下反而浪费内存？
-
-### 4. HashMap 的底层原理是什么？
-
-检查点：从哈希、桶、冲突和相等性四步解释写入与查找，并说明最坏情况怎样被限制。
-
-### 5. HashMap 为什么把容量设计成 2 的幂？
-
-检查点：区分稳定的哈希表原理与 Java HashMap 的下标、扩容实现选择。
-
-### 6. HashMap、Hashtable 和 ConcurrentHashMap 怎么选？
-
-检查点：单方法线程安全为什么不能保证“先查再写”原子？
-
-### 7. HashSet 为什么能去重？
-
-检查点：修改已经入 Set 对象的哈希字段后，为什么可能无法再找到它？
-
-### 8. 什么是 fail-fast？
-
-检查点：它为什么是错误检测而不是线程安全机制？快照迭代器采用了什么不同选择？
+JDK 文档把 fail-fast 定义为尽力而为，不能依赖它检测所有并发修改。它的作用是尽早暴露错误，而不是让有竞态的程序变正确。并发集合可能采用弱一致性遍历，`CopyOnWriteArrayList` 则采用快照遍历，语义并不相同。
 
 ### 9. Iterator 和增强 for 循环是什么关系？
 
-检查点：遍历集合和数组时，增强 for 的底层路径有什么不同？
+**直接回答：** 增强 for 遍历实现了 `Iterable` 的集合时，编译器会把它转换为基于 `Iterator` 的循环；遍历数组时则直接使用下标，不会创建 Iterator。
+
+```java
+for (String name : names) {
+    System.out.println(name);
+}
+```
+
+遍历集合时，可以近似理解为：
+
+```java
+for (Iterator<String> it = names.iterator(); it.hasNext(); ) {
+    String name = it.next();
+    System.out.println(name);
+}
+```
+
+增强 for 更简洁，但拿不到迭代器本身。需要安全删除当前元素、同时遍历两个迭代器，或精确控制推进过程时，应显式使用 `Iterator`。需要按下标或逆序访问 `List` 时，普通 for 循环可能更合适。
 
 ### 10. Comparable 和 Comparator 有什么区别？
 
-检查点：比较关系不满足传递性，或者与 `equals()` 不一致时，有序集合会出现什么问题？
+**直接回答：** `Comparable` 把一种“自然顺序”写进类型本身；`Comparator` 在类型外部提供排序规则，适合一个类型有多种排序方式的情况。
+
+```java
+record Product(String name, int price) {}
+
+Comparator<Product> byPrice = Comparator.comparingInt(Product::price);
+Comparator<Product> byNameThenPrice = Comparator
+        .comparing(Product::name)
+        .thenComparingInt(Product::price);
+
+products.sort(byPrice);
+```
+
+例如，版本号类型可以实现 `Comparable<Version>` 定义默认版本顺序；商品既可能按价格排，也可能按名称排，交给不同 `Comparator` 更清楚。
+
+比较规则要稳定并满足传递性：如果 A 小于 B、B 小于 C，那么 A 应小于 C。不要用 `a - b` 比较整数，因为可能溢出，使用 `Integer.compare(a, b)`。在 `TreeMap` 和 `TreeSet` 中，比较结果为 0 会被视为同一个位置；如果比较器与 `equals()` 的业务语义不一致，元素可能被意外覆盖或去重。
 
 ### 11. HashMap、LinkedHashMap 和 TreeMap 怎么选？
 
-检查点：分别从快速定位、稳定遍历、排序和范围查询推导选择。
+**直接回答：** 只需要根据 Key 查询时用 `HashMap`；需要稳定的插入或访问顺序时用 `LinkedHashMap`；需要按 Key 排序、查最近值或范围时用 `TreeMap`。
+
+- **`HashMap`：** 不保证遍历顺序，查询常见平均成本为 O(1)，适合普通索引。
+- **`LinkedHashMap`：** 保持插入顺序，或配置为访问顺序；查询常见平均成本为 O(1)，适合稳定展示和 LRU 思路。
+- **`TreeMap`：** 按 Key 的自然顺序或 Comparator 排序，查询成本为 O(log n)，适合 `floorKey`、`ceilingKey` 和 `subMap`。
+
+```java
+NavigableMap<Integer, String> rules = new TreeMap<>();
+rules.put(0, "普通用户");
+rules.put(1000, "银卡用户");
+rules.put(5000, "金卡用户");
+
+String level = rules.floorEntry(3200).getValue(); // 银卡用户
+```
+
+不要依赖 `HashMap` 当前看起来稳定的输出顺序，它的 API 没有做这个承诺。`LinkedHashMap` 通过额外链表保存顺序，会付出额外内存；`TreeMap` 通过红黑树维护顺序，单次查询成本高于哈希表的常见平均情况。选择取决于你是否真的需要顺序能力。
+
+## 队列与并发集合：特殊场景怎么选？
 
 ### 12. Queue 和 Deque 有什么区别？
 
-检查点：为什么任务队列需要 BlockingQueue，而普通 ArrayDeque 不够？
+**直接回答：** `Queue` 主要表达先进先出，只操作队头和队尾；`Deque` 是双端队列，两端都能添加和删除，因此既可以当队列，也可以当栈。单线程普通场景通常使用 `ArrayDeque`。
+
+```java
+Deque<String> tasks = new ArrayDeque<>();
+tasks.offerLast("task-1"); // 队尾放入
+tasks.offerLast("task-2");
+
+String first = tasks.pollFirst(); // 队头取出 task-1
+```
+
+队列 API 通常成对出现：添加可选 `add`（失败时抛异常）或 `offer`（返回特殊值）；取出并删除可选 `remove` 或 `poll`；只查看队头可选 `element` 或 `peek`。
+
+`ArrayDeque` 不允许 null，因为 `poll` 返回 null 常用来表示队列为空。需要多线程生产者、消费者等待，或者必须限制队列容量时，应选 `BlockingQueue` 的具体实现；普通 `ArrayDeque` 不提供阻塞和背压。
 
 ### 13. CopyOnWriteArrayList 适合什么场景？
 
-检查点：它把写入成本换成了什么读取语义？数据增大或写入变多后哪里先出问题？
+**直接回答：** 它适合元素不多、读和遍历非常频繁、写入很少，并且读者需要稳定快照的场景，例如监听器列表。写频繁或列表很大时不要用。
+
+`CopyOnWriteArrayList` 的思路很直白：每次修改都复制一份底层数组，在副本上完成修改后再发布新数组；已经创建的迭代器继续读取旧数组。
+
+```java
+CopyOnWriteArrayList<String> listeners = new CopyOnWriteArrayList<>();
+listeners.add("email");
+
+Iterator<String> snapshot = listeners.iterator();
+listeners.add("sms");
+
+snapshot.forEachRemaining(System.out::println); // 只看到 email
+```
+
+它把成本从读转移到写：读不需要为遍历持有锁，但每次写都要复制数组，占用 CPU、内存带宽并产生垃圾。快照迭代器也不支持 `remove()`。因此“线程安全”只是必要条件，读写比例和快照语义才是选择它的真正依据。实现可参考固定版本的 [OpenJDK 21 `CopyOnWriteArrayList`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/CopyOnWriteArrayList.java)。
 
 ### 14. 不可变集合和只读视图有什么区别？
 
-检查点：谁仍然持有底层引用？读者看到的是稳定快照还是会变化的视图？
+**直接回答：** 只读视图只禁止通过这层包装修改，原集合变化时视图也会变化；不可变集合本身不允许增删元素。需要与调用方隔离时，通常创建不可变副本，而不是只包一层视图。
 
-### 30 秒表达骨架
+```java
+List<String> source = new ArrayList<>(List.of("A"));
 
-“我不会先按惯例选集合，而是先确认基本事实：数组连续且长度固定，线性搜索会随数据增长，哈希会冲突，排序需要稳定关系。由此，按下标访问推导出动态数组，按 Key 缩小搜索范围推导出哈希表，范围查询推导出树；没有一种结构能让所有操作都最低成本。”
+List<String> view = Collections.unmodifiableList(source);
+List<String> snapshot = List.copyOf(source);
 
-### 3 分钟表达骨架
+source.add("B");
 
-先用订单列表说明访问、定位和范围查询的冲突；再推导数组、哈希表和树的结构与复杂度；接着用 OpenJDK 21 的 ArrayList 扩容、HashMap 桶定位和冲突分支验证实现；最后补充可变 Key、复合原子操作、快照读取等失败边界。
+System.out.println(view);     // [A, B]，仍能看到原集合变化
+System.out.println(snapshot); // [A]，结构是独立快照
+```
 
-## 参考资料
+需要注意三个边界：
 
-- [OpenJDK 21：ArrayList](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java)
-- [OpenJDK 21：HashMap](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java)
-- [Java Collections Framework](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-overview.html)
+- `List.of(...)` 和 `List.copyOf(...)` 不允许 null 元素。
+- “集合不可变”只表示不能增删替换集合中的引用，不代表元素对象本身不可变。
+- `List.copyOf` 是浅拷贝：集合结构独立，但其中的可变对象仍可能被其他代码修改。
+
+因此，对外返回配置、规则等不希望被修改的数据时，要同时考虑集合结构和元素对象是否都需要不可变。
+
+## 把选择过程变成习惯
+
+遇到集合选型，可以按这个顺序判断：
+
+1. **先看语义：** 是一串元素、唯一元素，还是 Key-Value？
+2. **再看主要操作：** 按下标、按 Key、按顺序，还是做范围查询？
+3. **再看规模与比例：** 数据有多少，读多还是写多，是否频繁扩容？
+4. **最后看共享方式：** 是否跨线程修改，单方法原子是否足够，读者需要实时数据还是快照？
+
+例如“保存订单并按订单号查询”自然导向 `HashMap<String, Order>`；“按创建时间查询一段订单”只用 HashMap 就不够，可能需要 `TreeMap`，也可能数据最终应交给数据库索引。集合解决的是进程内数据组织问题，不应该替代持久化与分布式一致性设计。
+
+## 面试时怎么表达
+
+### 30 秒回答骨架
+
+先说选择，再说原因，最后补边界：
+
+> 我会先看数据语义和主要操作。要位置和重复元素用 List，去重用 Set，按 Key 查值用 Map。具体实现上，普通 List 通常先选 ArrayList；普通 Key 查询用 HashMap；需要顺序选 LinkedHashMap 或 TreeMap；并发读写再考虑并发集合。最后还要结合数据规模、读写比例和复合操作的原子边界，不能只背复杂度。
+
+### 3 分钟回答骨架
+
+1. 用一个业务例子说明需要保留的规则，例如订单列表要有顺序、订单索引要按 ID 定位。
+2. 说明底层结构：ArrayList 是动态数组，HashMap 是桶数组加冲突结构，TreeMap 是有序树。
+3. 解释结构怎样带来复杂度和内存代价，而不是只报 O(1)、O(n)。
+4. 补充正确性边界：`equals/hashCode`、可变 Key、比较器一致性和复合操作原子性。
+5. 如果问题涉及源码，再限定 OpenJDK 21，说明扩容、树化等数字是版本实现，不把实现细节说成永恒原理。
+
+## 继续验证
+
+- [Java Collections Framework 概览（Java 21）](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-overview.html)
+- [OpenJDK 21：ArrayList 源码](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/ArrayList.java)
+- [OpenJDK 21：HashMap 源码](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/HashMap.java)
+- [OpenJDK 21：ConcurrentHashMap 源码](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java)
+- [OpenJDK 21：CopyOnWriteArrayList 源码](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/CopyOnWriteArrayList.java)
 
 ---
 

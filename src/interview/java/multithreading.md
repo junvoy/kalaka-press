@@ -2,298 +2,205 @@
 outline: [2, 3]
 ---
 
-# 有限资源下怎样调度、取消和隔离任务
+# Java 多线程：任务怎样调度、取消和隔离？
 
-多线程不是“创建越多线程越快”。CPU 核心、内存、连接池和下游容量都有限，任务到达又可能突发。线程与线程池的真正作用，是在这些约束下决定谁现在执行、谁等待、过载时拒绝谁，以及失败怎样被观察。
+本章讨论线程生命周期、任务调度、线程池和异步结果。共享变量怎样通过 JMM、锁与 CAS 保持正确，统一放在[并发正确性](./concurrency)。
 
-## 目标：不预设线程池参数
+## 线程与任务
 
-我们要解决的问题是：怎样让大量任务共享有限计算资源，同时保持生命周期可控、过载有边界、取消能协作、异常不丢失，并且出现阻塞或死锁时能够定位？
+### 1. 进程、线程和任务有什么区别？
 
-学习后应当能够：
+**直接回答：** 进程是拥有独立地址空间和系统资源的运行实例；线程是进程内可被调度的执行单元，同一进程的线程共享堆等资源；任务是“要做什么”的业务描述，可以交给不同线程执行。
 
-1. 区分进程、线程和任务，不把业务任务等同于 OS 线程。
-2. 从有限资源推导线程池的工作线程、队列、拒绝和关闭协议。
-3. 从协作式执行推导 interrupt、Future 取消和异常传播。
-4. 从平台线程成本推导虚拟线程，并说明它不会扩大下游容量。
-5. 用到达率、服务时间、队列等待和尾延迟验证线程数，而不是套公式结束。
+把任务与线程分开很重要：`Runnable`、`Callable` 描述工作，Executor 决定何时、在哪个线程执行。业务代码通常不应为每个任务都手动创建平台线程。
 
-::: tip 本章边界
-本章讨论任务生命周期与资源调度。共享状态的原子性、可见性和锁语义统一放在 [Java 并发](./concurrency)。
-:::
+### 2. Java 创建线程有哪些方式？推荐哪一种？
 
-## 拆掉现成答案
-
-| 常见说法 | 分类 | 被隐藏的条件 |
-| --- | --- | --- |
-| 开一个线程就是并行执行 | 错误等同 | 能否并行受核心数和调度器影响，单核也会交错执行 |
-| 创建线程有三种方式 | API 罗列 | Thread、Runnable、Callable 最终都要映射为“任务由某个执行者调度” |
-| 线程池能提高性能 | 条件结论 | 复用只降低部分创建成本，无界队列和下游过载会让系统更慢 |
-| 队列越大越不容易拒绝 | 局部正确 | 大队列把拒绝变成长等待和内存占用，可能先触发业务超时 |
-| 中断会立刻杀死线程 | 错误假设 | interrupt 是协作信号，任务必须在阻塞点或代码中响应 |
-| `submit()` 比 `execute()` 更安全 | 缺条件结论 | Future 若无人读取，异常反而可能被静默忽略 |
-| 线程数等于 CPU 核数加一 | 经验公式 | 任务等待比例、容器配额、下游容量和延迟目标都会改变结果 |
-| 虚拟线程可以解决所有高并发 | 错误外推 | 它降低线程成本，不增加 CPU、数据库连接和远程服务配额 |
-
-## 从基本事实重新构造
-
-### 从资源隔离推导进程、线程与任务
-
-操作系统需要隔离地址空间和资源，这形成进程；一个进程内部又需要多个独立执行流共享代码和堆，这形成线程。业务中的“发送一封邮件”“处理一次请求”则是任务，它不必永久绑定一个线程。
-
-```text
-进程：资源与故障隔离边界
-  └─ 线程：带调用栈的执行流
-       └─ 某一时刻正在执行一个任务
-```
-
-平台线程通常映射到 OS 线程，创建和切换都不是零成本。线程之间共享进程内存，因此状态正确性仍需遵守上一章的并发协议。
-
-### 从一次性生命周期推导 `start()` 与线程状态
-
-直接调用 `run()` 只是当前线程的一次普通方法调用；`start()` 才请求 JVM 创建新的并发执行活动，并最终由新线程调用 `run()`。同一个 Thread 对象只能成功启动一次，因为它表示一段不可逆的生命周期。
-
-![Java 线程状态与常见转换](/.image/interview/java/multithreading/thread-states.svg)
-
-Java API 暴露六种状态：NEW、RUNNABLE、BLOCKED、WAITING、TIMED_WAITING、TERMINATED。RUNNABLE 同时覆盖正在 CPU 上运行和等待操作系统调度，不等于“此刻一定占用核心”。
-
-创建业务任务时优先把任务与执行策略分离：任务实现 Runnable 或 Callable，线程工厂、Executor 或虚拟线程执行器决定怎样运行。直接继承 Thread 会把业务逻辑和生命周期绑在一起，通常不利于复用与测试。
-
-### 从等待原因推导 `sleep()`、`wait()` 与阻塞
-
-线程暂停有不同原因：
-
-- `sleep` 表示当前线程在一段时间内不参与运行，不释放已经持有的监视器。
-- `wait` 表示对象条件尚未满足，调用者必须持有对应监视器；它释放监视器并进入等待集合，返回前还要重新竞争锁。
-- 等锁进入 BLOCKED；等待通知、join 或 park 进入 WAITING；带期限的等待进入 TIMED_WAITING。
-
-条件等待必须放在循环中重新检查，因为通知只代表“可能值得再检查”，不证明业务条件仍成立，也可能出现虚假唤醒。
-
-### 从协作执行推导中断与停止
-
-强制终止可能把共享状态停在一半，因此 Java 的正常停止协议是协作式：一方设置 interrupt 状态，任务在阻塞方法收到 `InterruptedException`，或在计算循环中主动检查状态，然后清理并返回。
+**直接回答：** 可以继承 Thread、传入 Runnable、使用 Callable/Future，或提交到 Executor；业务代码通常优先提交任务给受控的 Executor，因为它能统一管理并发数、排队、拒绝、命名和关闭。
 
 ```java
-while (!Thread.currentThread().isInterrupted()) {
-    processOneUnit();
-}
+ExecutorService executor = Executors.newFixedThreadPool(4);
+Future<Integer> future = executor.submit(() -> calculate());
 ```
 
-捕获 `InterruptedException` 后若当前层不能完成停止，应恢复中断状态或继续抛出，不能无声吞掉。Future.cancel(true) 也只是请求中断正在执行的任务，不承诺任务已经停止，更不承诺外部副作用已回滚。
-
-### 从有限核心推导上下文切换
-
-可运行线程多于核心时，调度器需要保存当前执行状态并恢复另一个线程。切换成本包括调度、寄存器与栈状态恢复、缓存局部性破坏，以及锁竞争带来的额外等待。
-
-因此更多线程只在能够覆盖阻塞等待、且没有压垮下游时提高吞吐。CPU 密集任务超过有效核心后，常见结果是切换增加而吞吐不再增长。
-
-### 从等待环推导死锁
-
-若任务互相持有对方需要的资源，系统可能永久无进展。经典必要条件包括互斥、持有并等待、不可抢占和循环等待；工程上最常消除的是循环等待：为多个资源定义全局获取顺序。
-
-排查不能只看某个线程 WAITING：需要线程转储中的持有锁、等待锁和循环关系，并间隔采集确认状态持续。超时获取能避免无限等待，却还要处理已完成一半的业务回滚。
-
-### 从复用与过载推导线程池
-
-平台线程创建有成本，任务到达又会波动，于是复用固定工作线程并增加等待队列。但一旦引入队列，系统就必须明确容量与过载策略：
-
-![ThreadPoolExecutor 接收任务的关键决策](/.image/interview/java/multithreading/thread-pool-submit.svg)
-
-OpenJDK 21 `ThreadPoolExecutor.execute` 的关键顺序是：
-
-1. 工作线程少于 corePoolSize，优先尝试创建核心线程。
-2. 否则尝试把任务放入 workQueue，并在入队后复核运行状态和工作线程。
-3. 队列无法接收时，尝试创建不超过 maximumPoolSize 的非核心线程。
-4. 仍无法接收则执行 RejectedExecutionHandler。
-
-这解释了为什么使用无界队列时 maximumPoolSize 通常难以生效：任务会持续排队而不是触发扩线程。大队列并没有消除过载，只是把拒绝信号变成等待时间和内存占用。
-
-### 从背压推导队列与拒绝策略
-
-当到达率长期高于完成率，积压必然增长。系统只能选择：降低输入、提高可持续处理能力、丢弃部分工作，或让调用方承担等待。
-
-- AbortPolicy 明确抛出拒绝，适合让上游感知失败。
-- CallerRunsPolicy 让提交线程执行，形成反馈减速，但可能占用请求线程并放大上游延迟。
-- DiscardPolicy 静默丢弃，只有业务明确允许且有监控时才可用。
-- DiscardOldestPolicy 丢弃队头任务再重试，可能破坏顺序和重要性。
-
-生产线程池需要监控活跃数、队列长度、排队时长、拒绝数、任务耗时和异常。关闭时先停止接收，再等待已有任务；超时后请求中断，并为未完成任务定义恢复或补偿。
-
-### 从结果所有权推导 execute、Future 与异常
-
-`execute(Runnable)` 没有结果句柄，未捕获异常通常到达工作线程的 UncaughtExceptionHandler；`submit` 把任务包装成 Future，异常保存在结果中，并在 `get()` 时以 ExecutionException 暴露。
-
-因此 Future 无人读取不是“更安全”，而是异常可能无人观察。生产代码应统一：
-
-- 在任务边界记录任务标识、输入摘要和耗时。
-- 对 Future 设置超时并读取结果。
-- 为异步链定义异常分支，不只写成功回调。
-- 区分任务失败、取消请求和线程池拒绝。
-
-CompletableFuture 用阶段图组合异步结果，减少手写回调嵌套；它不会自动传播所有业务上下文，也不会自动取消已经启动的下游操作。默认异步方法可能使用公共 ForkJoinPool，线上应显式决定执行器与隔离边界。
-
-### 从负载模型推导线程数
-
-Little 定律给出稳定系统的基本关系：系统中的平均任务数约等于到达率乘以平均停留时间。若到达率长期超过服务能力，任何线程数公式都只能延迟失败。
-
-常见起点：
-
-```text
-线程数 ≈ 有效 CPU 核数 × 目标利用率 × (1 + 等待时间 / 计算时间)
-```
-
-它不是验收结论。最终要受这些更硬的上限约束：容器 CPU 配额、内存、数据库连接、远程并发配额和允许的排队时间。用阶梯压测寻找吞吐不再增长或 P99 开始恶化的点，并给不同业务独立池，避免慢任务占满公共资源。
-
-### 从平台线程成本推导虚拟线程
-
-高并发阻塞 I/O 希望保留“一个任务一条顺序调用栈”，平台线程又太昂贵。JDK 21 的虚拟线程由 JDK 调度，大量虚拟线程可以在较少的平台线程上挂载和卸载；阻塞在支持的 JDK I/O 上时，载体线程可以运行其他虚拟线程。
-
-```java
-try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-    Future<String> result = executor.submit(this::loadRemoteData);
-    System.out.println(result.get());
-}
-```
-
-JEP 444 的核心边界：
-
-- 虚拟线程适合大量彼此独立、主要等待 I/O 的任务。
-- CPU 密集工作不会因线程数量增加而变快。
-- 虚拟线程便宜，因此通常每任务创建一个，不要再把它们池化。
-- 数据库连接和外部接口仍需 Semaphore、连接池或限流器约束。
-- ThreadLocal 在海量虚拟线程下可能放大内存成本，不能用来池化昂贵资源。
-
-### 从时间语义推导定时执行
-
-Timer 只有一条执行线程，一个任务长时间运行会拖延其他任务，未处理异常还可能终止调度线程。ScheduledExecutorService 使用受控线程池并提供两种不同语义：
-
-- `scheduleAtFixedRate` 尽量维持计划频率，适合关注节拍的短任务。
-- `scheduleWithFixedDelay` 在上次完成后再等待固定延迟，适合不能重叠的轮询。
-
-单机调度不等于集群只执行一次。多实例业务需要租约、分布式调度或幂等任务，而不是依赖本地线程池协调多节点。
-
-## 固定版本的实现与源码验证
-
-- [Java SE 21 `Thread` API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html)：线程状态、中断和虚拟线程 API 契约。
-- [OpenJDK `jdk-21-ga`](https://github.com/openjdk/jdk/tree/jdk-21-ga)：固定实现入口。
-- [`ThreadPoolExecutor.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ThreadPoolExecutor.java)：接收任务、工作线程和关闭状态机。
-- [`FutureTask.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/FutureTask.java)：结果、异常、取消和完成状态。
-- [`CompletableFuture.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/CompletableFuture.java)：阶段组合与完成传播。
-- [`VirtualThread.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/lang/VirtualThread.java) 与 [JEP 444](https://openjdk.org/jeps/444)：JDK 21 虚拟线程实现和设计边界。
-
-## 最小实验：让过载和异常可见
-
-### 实验一：`start()` 与 `run()` 的线程身份
-
-分别调用同一个 Runnable 的 `run()` 和新 Thread 的 `start()`，打印当前线程名。验证 run 不创建新执行流；再第二次调用同一 Thread.start，观察生命周期约束。
-
-### 实验二：有界队列产生背压
-
-构造 core=1、max=2、队列容量=1 的线程池，让任务阻塞在 CountDownLatch。连续提交并记录任务落点、队列长度和拒绝，验证 `execute` 的四步决策。
-
-### 实验三：异常是否有人观察
-
-让同一异常任务分别通过 execute 和 submit 运行：前者观察 UncaughtExceptionHandler，后者不调用 get 时检查日志，再调用 get 获取 ExecutionException。由此建立任务结果所有权。
-
-### 实验四：虚拟线程不增加下游容量
-
-用大量虚拟线程竞争一个固定大小 Semaphore，并记录同时进入临界区的最大数量。吞吐上限仍由许可和下游服务时间决定。
-
-## 验证与证伪
-
-| 假设 | 改变条件 | 证伪信号 |
-| --- | --- | --- |
-| 更多平台线程总能提高吞吐 | 在线程数超过核心后运行 CPU 任务 | 切换增加，吞吐趋平或下降 |
-| 大队列能解决突发流量 | 让到达率持续高于完成率 | 排队和超时持续上升 |
-| interrupt 会立即停止任务 | 在任务中吞掉 InterruptedException | 任务继续运行 |
-| submit 会自动记录异常 | 不保存或读取 Future | 失败可能没有业务日志 |
-| Future.cancel 能回滚副作用 | 在取消前完成一次外部写入 | 写入不会自动撤销 |
-| 虚拟线程能扩大数据库容量 | 固定连接池并提高虚拟线程数 | 等待连接的任务增加，数据库上限不变 |
-
-## 工程取舍与失败边界
-
-- 有界队列会更早暴露过载，这是保护系统而不是功能缺陷。
-- CallerRuns 能反馈减速，也可能堵塞请求线程；必须结合调用链超时评估。
-- 超时结束等待，不等于下游操作已经停止或回滚。
-- 公共线程池简洁，却会让无关业务共享故障域；生产任务通常需要显式隔离。
-- 虚拟线程降低并发代码的线程成本，不改变共享状态、幂等、限流和超时要求。
-- 调度任务在多实例部署中会重复执行，业务必须具备集群协调或幂等能力。
-
-## 理解自测与面试表达
-
-以下 16 个标题保持原样。回答线程池题时先说负载和边界，再说参数。
-
-### 1. 进程和线程有什么区别？
-
-**正文定位：** 资源隔离与执行流。**反事实追问：** 同一进程线程共享堆为何仍有各自调用栈？**表达骨架：** 30 秒比较隔离、共享、切换成本和故障影响。
-
-### 2. 创建线程有哪些方式？推荐哪一种？
-
-**正文定位：** 任务与执行策略分离。**反事实追问：** Runnable 为什么不是一条已经启动的线程？**表达骨架：** 3 分钟从任务接口讲到 Executor、线程工厂和虚拟线程。
+“四种创建线程方式”更准确地说是不同任务提交与结果抽象；Future 和 CompletableFuture 本身不是线程。生产环境还要显式命名线程、选择队列和拒绝策略，不应只靠默认工厂。
 
 ### 3. `start()` 和 `run()` 有什么区别？
 
-**正文定位：** 一次性线程生命周期。**反事实追问：** 为什么同一 Thread 不能启动两次？**表达骨架：** 30 秒讲新执行流、当前线程普通调用和状态约束。
+**直接回答：** `start()` 请求 JVM 启动新线程，随后由新线程调用 `run()`；直接调用 `run()` 只是当前线程的一次普通方法调用，不会创建新线程。同一个 Thread 对象只能成功启动一次。
+
+```java
+Thread thread = new Thread(() ->
+    System.out.println(Thread.currentThread().getName()));
+
+thread.run();   // 当前线程
+thread.start(); // 新线程
+```
+
+`start()` 返回不代表任务已完成，线程何时真正运行由调度决定；等待完成应使用 `join()`、Future 或更高层协调工具。
 
 ### 4. Java 线程有哪些状态？
 
-**正文定位：** API 状态图。**反事实追问：** RUNNABLE 为什么不等于此刻正在 CPU 上执行？**表达骨架：** 3 分钟按状态、触发动作和排障含义回答。
+**直接回答：** `Thread.State` 定义 NEW、RUNNABLE、BLOCKED、WAITING、TIMED_WAITING、TERMINATED 六种状态。Java 的 RUNNABLE 同时覆盖操作系统层“正在运行”和“可运行但等待 CPU”的情况。
+
+![Java 线程状态与常见转换](/.image/interview/java/multithreading/thread-states.svg)
+
+- 等待进入 `synchronized` 监视器是 BLOCKED。
+- `Object.wait()`、`Thread.join()` 等无超时等待常见为 WAITING。
+- `sleep()`、带超时的 wait/join 常见为 TIMED_WAITING。
+- 等待 Socket I/O 在 Java 层不一定显示为 BLOCKED，不能只凭状态名下结论。
+
+线程转储是某一时刻的证据，排障应多次采样并结合锁拥有者、栈帧、CPU 和请求指标。
 
 ### 5. `sleep()` 和 `wait()` 有什么区别？
 
-**正文定位：** 时间等待与条件等待。**反事实追问：** wait 返回后为什么还要重新检查条件？**表达骨架：** 30 秒比较所属 API、锁要求、是否释放监视器和唤醒方式。
+**直接回答：** `sleep()` 是 Thread 的定时暂停，不要求持有监视器，也不会释放已经持有的锁；`wait()` 是对象监视器的条件等待，必须在持有该监视器时调用，并会释放对应监视器。
+
+`wait()` 被唤醒后还要重新竞争锁，并在 `while` 中检查条件；`sleep()` 到期只表示线程重新有资格被调度，不保证立即执行。二者都可能被中断。
 
 ### 6. 怎样正确停止一个线程？
 
-**正文定位：** 协作式中断。**反事实追问：** 吞掉 InterruptedException 会破坏什么协议？**表达骨架：** 3 分钟讲发出信号、阻塞点响应、清理、恢复中断和副作用边界。
+**直接回答：** 使用协作式取消：调用 `interrupt()` 发出请求，任务在阻塞点或循环中检测中断，完成清理后退出。不要使用已废弃的 `stop()` 强行终止，也不要吞掉 `InterruptedException`。
 
-### 7. 什么是线程上下文切换？
+```java
+while (!Thread.currentThread().isInterrupted()) {
+    try {
+        doOneTask();
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+    }
+}
+```
 
-**正文定位：** 有限核心调度。**反事实追问：** I/O 任务为什么有时需要多于核心数的线程？**表达骨架：** 30 秒讲保存恢复、缓存影响、阻塞覆盖和测量指标。
+中断不是“杀死线程”，只是一个协议。任务若调用不响应中断的外部 API，还需要超时、关闭资源或组件专用的取消机制。
 
-### 8. 线程池的核心参数有哪些？任务如何执行？
+### 7. 什么是线程上下文切换？为什么线程越多不一定越快？
 
-**正文定位：** 四步接收流程。**反事实追问：** 无界队列下 maximumPoolSize 为什么常不生效？**表达骨架：** 3 分钟按运行状态、core、queue、max、reject 和回查分支回答。
+**直接回答：** 调度器从一个可运行线程切到另一个线程时，要保存和恢复执行上下文，还可能破坏 CPU 缓存局部性。线程超过 CPU 与阻塞需求后，切换、竞争、内存占用和下游压力可能抵消并行收益。
 
-### 9. 线程池有哪些拒绝策略？
+CPU 密集任务的并行上限主要受核心数限制；I/O 密集任务可以允许更多并发来覆盖等待，但仍受连接池、数据库、远端限流和内存约束。线程数不能脱离整条资源链路单独计算。
 
-**正文定位：** 过载决策。**反事实追问：** CallerRuns 为什么既是背压也可能放大请求延迟？**表达骨架：** 30 秒列四种内置策略并说明业务选择条件。
+## 线程池与过载
 
-### 10. 什么是死锁？怎样避免和排查？
+### 8. 线程池的核心参数和执行流程是什么？
 
-**正文定位：** 循环等待。**反事实追问：** 超时拿锁后失败，已完成一半的业务怎么办？**表达骨架：** 3 分钟讲条件、统一顺序、超时回滚和多份线程转储。
+**直接回答：** ThreadPoolExecutor 的关键参数是 corePoolSize、maximumPoolSize、keepAliveTime、workQueue、threadFactory 和 handler。提交任务时通常按“核心线程 → 队列 → 非核心线程 → 拒绝”决策。
+
+![ThreadPoolExecutor 接收任务的关键分支](/.image/interview/java/multithreading/thread-pool-submit.svg)
+
+```text
+运行线程少于 corePoolSize        -> 创建核心线程
+否则队列还能接收                -> 入队
+否则线程少于 maximumPoolSize    -> 创建非核心线程
+否则                            -> 执行拒绝策略
+```
+
+这个顺序解释了为什么使用无界队列时 maximumPoolSize 常常没有机会生效。源码可从 OpenJDK 21 [`ThreadPoolExecutor.execute`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ThreadPoolExecutor.java) 验证。
+
+### 9. 线程池队列怎么选？
+
+**直接回答：** 队列表达系统愿意缓存多少等待工作：有界队列能形成过载边界；无界队列容易让延迟和内存不断增长；`SynchronousQueue` 不存任务，要求提交者直接交给可用工作线程。
+
+- `ArrayBlockingQueue`：固定容量，内存与过载边界清晰。
+- `LinkedBlockingQueue`：可设容量，不设时容量非常大，不等于没有代价。
+- `SynchronousQueue`：直接移交，常配合能弹性增长的线程数。
+- `DelayQueue`、优先队列：只有业务确实需要相应顺序语义时使用。
+
+队列不是越大越安全。任务处理速度低于到达速度时，任何有限系统最终都要排队、拒绝、限流或降级。
+
+### 10. 线程池有哪些拒绝策略？
+
+**直接回答：** JDK 内置 AbortPolicy 抛异常、CallerRunsPolicy 让提交线程执行、DiscardPolicy 静默丢弃、DiscardOldestPolicy 丢弃队头后重试。生产选择必须匹配任务能否丢、调用方能否被反压以及是否需要审计补偿。
+
+CallerRunsPolicy 可以减慢提交方，但如果提交线程是事件循环或持有关键锁，反而会放大故障；静默丢弃通常需要额外指标和补偿，否则业务只会“悄悄消失”。
 
 ### 11. `execute()` 和 `submit()` 有什么区别？
 
-**正文定位：** 结果与异常所有权。**反事实追问：** submit 后不调用 get 为什么可能更难发现失败？**表达骨架：** 30 秒比较返回值、异常路径和观测责任。
+**直接回答：** `execute(Runnable)` 没有返回结果，未捕获异常通常进入工作线程的异常处理路径；`submit(...)` 返回 Future，任务结果或异常被 Future 保存，调用 `get()` 时再观察。
 
-### 12. Future 和 CompletableFuture 有什么区别？
+```java
+Future<?> future = executor.submit(() -> {
+    throw new IllegalStateException("failed");
+});
 
-**正文定位：** 单结果等待与阶段图。**反事实追问：** CompletableFuture.cancel 会自动取消所有远端请求吗？**表达骨架：** 3 分钟讲组合能力、异常链、执行器、超时和取消边界。
+future.get(); // 抛 ExecutionException，cause 是原异常
+```
 
-### 13. 线程池中的任务异常怎样处理？
+如果提交后从不读取 Future，也没有统一的任务装饰器或监控，异常就可能长期不被发现。线程池不仅要“跑任务”，还要让排队、耗时、拒绝与失败可观察。
 
-**正文定位：** 任务边界观测。**反事实追问：** 工作线程没退出是否代表任务没失败？**表达骨架：** 3 分钟区分 execute、submit、Future、afterExecute 和统一日志。
+### 12. 线程池中的任务异常怎样处理？
 
-### 14. 线程池大小应该怎样设置？
+**直接回答：** 在任务边界记录必要上下文；execute 路径可配置 `UncaughtExceptionHandler`，submit 路径要读取 Future，或重写 `afterExecute` 统一提取异常。不要只在业务内部无差别 catch 后继续运行。
 
-**正文定位：** 到达率与服务能力。**反事实追问：** 数据库只有 20 个连接时，200 个工作线程会怎样？**表达骨架：** 3 分钟给估算起点、硬上限、阶梯压测和 P99 验证。
+异常策略要区分可重试、不可重试和进程级错误。失败重试还必须有次数、退避、幂等和死信/人工处理边界，否则线程池可能被同一批失败任务占满。
 
-### 15. 什么是虚拟线程？适合什么场景？
+### 13. 线程池大小应该怎样设置？
 
-**正文定位：** 平台线程成本与 M:N 调度。**反事实追问：** CPU 密集任务和连接池为何不会因虚拟线程变快？**表达骨架：** 3 分钟讲问题、挂载/卸载、每任务一线程、下游限流和 JDK 21 边界。
+**直接回答：** 先按 CPU 密集或等待密集得到初始值，再以压测和生产指标校准；同时受数据库连接池、下游限流、内存和延迟目标约束。不存在脱离工作负载的万能公式。
 
-### 16. 定时任务为什么优先使用 ScheduledExecutorService？
+CPU 密集可从接近可用核心数开始；等待密集可以适当增加并发，但要测量实际计算时间与等待时间。至少观察吞吐、队列长度、活跃线程、拒绝数、任务等待时间、执行时间和下游饱和度。
 
-**正文定位：** 调度线程与时间语义。**反事实追问：** 多实例部署时为什么会执行多次？**表达骨架：** 30 秒比较 Timer、fixed-rate、fixed-delay 和集群协调。
+### 14. 为什么不同业务要隔离线程池？
 
-## 参考资料
+**直接回答：** 共享一个池时，慢 I/O、批处理或失败重试可能占满线程和队列，拖垮本来健康的请求。按延迟目标、资源依赖和失败模式隔离，可以把故障限制在较小范围。
 
-- [Java SE 21 `java.util.concurrent` API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html)
-- [Java SE 21 `Thread` API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html)
-- [OpenJDK `jdk-21-ga` 源码](https://github.com/openjdk/jdk/tree/jdk-21-ga)
+隔离也有代价：线程、队列和监控数量变多，总并发若不受控仍会压垮下游。因此要同时设置全局资源预算，而不是每个模块各建一个“大池”。
+
+## 异步结果与现代线程
+
+### 15. Future 和 CompletableFuture 有什么区别？
+
+**直接回答：** Future 表示一个稍后可取的结果，主要支持阻塞获取和取消；CompletableFuture 还能组合、转换、汇合和处理异常，适合表达异步依赖图。
+
+```java
+CompletableFuture<User> user = loadUserAsync(id);
+CompletableFuture<List<Order>> orders =
+    user.thenCompose(value -> loadOrdersAsync(value.id()));
+```
+
+异步不等于非阻塞：回调中仍可能做阻塞 I/O；未显式指定 Executor 时，部分异步方法会使用公共 ForkJoinPool，可能与其他任务互相干扰。生产代码应明确执行器、超时、取消和异常汇合。
+
+### 16. 虚拟线程是什么？适合什么场景？
+
+**直接回答：** Java 21 的虚拟线程是 JVM 管理的轻量线程，适合大量“一个请求一个线程”的阻塞式 I/O 任务；它不让 CPU 计算更快，也不会增加数据库连接数或远端服务容量。
+
+```java
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    Future<Response> future = executor.submit(() -> callRemote());
+    return future.get();
+}
+```
+
+虚拟线程通常不需要像平台线程那样池化来节省线程对象，但仍要用 Semaphore、连接池或限流器控制稀缺下游资源。长期在 `synchronized` 中执行某些阻塞操作还可能造成载体线程钉住，应通过 JFR 观察，而不是凭 API 名猜测。
+
+### 17. 定时任务为什么优先用 ScheduledExecutorService？
+
+**直接回答：** 它把调度和任务执行纳入 Executor 生命周期，能配置延迟与周期，并支持 Future、取消和线程工厂；相比 `Timer`，它支持多个工作线程，一个任务异常也不会天然终止整套定时机制。
+
+`scheduleAtFixedRate` 关注计划频率，任务过慢时可能连续追赶；`scheduleWithFixedDelay` 在上次结束后再等待固定间隔。两者都不是跨进程分布式调度，也不自动保证任务只执行一次。
+
+## 面试表达与排障
+
+### 30 秒回答骨架
+
+> 我会把任务和线程分开，用受控 Executor 管理并发、队列、拒绝和关闭。线程池按核心线程、队列、最大线程、拒绝策略接收任务；取消采用中断协作。Future 负责结果，CompletableFuture 负责组合，虚拟线程适合高并发阻塞 I/O，但所有方案都必须服从下游容量和过载边界。
+
+### 线程问题排查顺序
+
+1. 看请求吞吐、延迟、错误和线程池队列是否同时异常。
+2. 连续获取多份线程转储，寻找重复热点栈、锁等待和死锁。
+3. 用 JFR、CPU profile 和下游指标区分计算、锁竞争、I/O 等待或过载。
+4. 修复后用相同负载验证吞吐、尾延迟、拒绝和资源占用，而不是只看平均值。
+
+## 权威参考
+
+- [Java SE 21 `Thread`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html)
+- [Java SE 21 `ThreadPoolExecutor`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html)
+- [OpenJDK 21 `ThreadPoolExecutor`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ThreadPoolExecutor.java)
+- [OpenJDK 21 `CompletableFuture`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/CompletableFuture.java)
 - [JEP 444：Virtual Threads](https://openjdk.org/jeps/444)
 
 ---
 
-[← 上一章：Java 并发](./concurrency) · [下一章：JVM →](./jvm)
+[← 上一章：并发正确性](./concurrency) · [下一章：JVM →](./jvm)
