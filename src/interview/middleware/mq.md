@@ -6,7 +6,7 @@ outline: [2, 3]
 
 消息队列（Message Queue，MQ）不是“接入后就不会丢消息”的保险箱。它把同步调用改造成跨时间、跨进程的异步协作，用解耦、缓冲和独立扩缩容换来了新的问题：消息可能延迟、重复、乱序、积压，也可能只在部分节点成功。
 
-本章先建立通用消息模型，再以官方发布标签 [`rocketmq-all-5.5.0`](https://github.com/apache/rocketmq/releases/tag/rocketmq-all-5.5.0) 验证存储、消费和事务回查机制。RabbitMQ、Kafka 与 RocketMQ 的术语和能力不同，稳定原理与产品实现会分开说明。
+本章先建立通用消息模型，再以官方发布标签 [`rocketmq-all-5.5.0`](https://github.com/apache/rocketmq/releases/tag/rocketmq-all-5.5.0) 验证存储、消费和事务回查机制。RabbitMQ、Kafka 与 RocketMQ 的术语和能力不同，稳定原理与产品实现会分开说明。产品专项题请进入 [RabbitMQ 面试题](./rabbitmq) 和 [Kafka 面试题](./kafka)。
 
 ## 目标：不预设消息队列
 
@@ -227,6 +227,18 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 先明确吞吐、端到端延迟、顺序范围、回放周期、路由、延迟、事务、团队经验和总成本，再通过接近真实负载的压测与故障演练选择。产品标签只能初筛，不能替代约束分析。
 
+### 三套术语不要混用
+
+| 需要表达的事实 | RabbitMQ | Kafka | RocketMQ |
+| --- | --- | --- | --- |
+| 消息分类/入口 | Exchange + Routing Key | Topic | Topic + Tag |
+| 并行与局部顺序载体 | Queue | Partition | MessageQueue |
+| 消费成功后的进度信号 | Consumer ACK | Offset | 消费进度/Offset |
+| 多实例怎样分工 | 同一 Queue 上竞争消费 | Consumer Group 分配 Partition | Consumer Group 分配 MessageQueue |
+| 历史消息怎样再次读取 | 普通 Queue 不是主模型；Stream 另论 | 保留期内重置 Offset | 按产品能力和保留边界重置/重放 |
+
+面试中可以先用共同原理解释“为什么会丢、重、乱、积压”，再切换到产品术语。不要在 RabbitMQ 中说“提交 Offset”，也不要把 Kafka 的 `acks=all` 当成消费者业务 ACK。
+
 ## 验证与证伪
 
 - 在消费者数据库提交后、ACK 前强制终止进程，验证消息会重投且幂等约束阻止重复生效。
@@ -319,7 +331,7 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 ### 18. RabbitMQ、Kafka 和 RocketMQ 怎样选型？
 
-检查点：先给业务约束、故障目标和运维条件，再说明产品匹配，不能只列标签。
+检查点：先给业务约束、故障目标和运维条件，再说明产品匹配，不能只列标签。继续追问见 [RabbitMQ 专项](./rabbitmq) 与 [Kafka 专项](./kafka)。
 
 ### 30 秒表达骨架
 
@@ -339,4 +351,4 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 ---
 
-[← 数据访问：MyBatis](../persistence/mybatis) · [下一层：分布式系统 →](../distributed/question)
+[← 数据访问：MyBatis](../persistence/mybatis) · [RabbitMQ 专项](./rabbitmq) · [Kafka 专项](./kafka) · [下一层：分布式系统 →](../distributed/question)

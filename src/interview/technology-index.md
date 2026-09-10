@@ -27,7 +27,9 @@ outline: [2, 3]
 
 - [MySQL](./mysql/question)
 - [Redis](./redis/question)
-- [消息队列与 RocketMQ](./middleware/mq)
+- [消息队列共同原理与 RocketMQ](./middleware/mq)
+- [RabbitMQ 面试题](./middleware/rabbitmq)
+- [Kafka 面试题](./middleware/kafka)
 - [配置、调度与数据集成](./integration/question)
 
 ## 分布式与工程交付
