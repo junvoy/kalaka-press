@@ -61,9 +61,7 @@ CPU、内存和线程都是有限资源。多个任务共享状态时会产生�
 
 只要一次业务跨越网络，就可能出现超时、重复、乱序和局部成功。分布式系统的核心不是消灭这些现象，而是定义权威状态、不变量和收敛路径。
 
-- [消息队列共同原理](./middleware/mq)：异步协作怎样处理持久化、确认、重试、幂等和积压。
-  - [RabbitMQ 面试题](./middleware/rabbitmq)：Exchange 路由、两段确认、DLX、Quorum Queue 与排障。
-  - [Kafka 面试题](./middleware/kafka)：Partition、Offset、ISR、Rebalance、事务与回放。
+- [消息队列](./middleware/mq)：先理解异步协作、可靠性与幂等，再在同一章区分 RabbitMQ、Kafka 和 RocketMQ。
 - [分布式系统设计](./distributed/question)：一致性、可用性、幂等、事务和容错怎样权衡。
 - [微服务治理](./microservices/question)：服务发现、RPC、限流、熔断和网关怎样控制调用关系。
 - [配置、调度与数据集成](./integration/question)：异构任务怎样可重复执行、追踪和恢复。

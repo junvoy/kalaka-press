@@ -1,12 +1,20 @@
 ---
-outline: [2, 3]
+outline: [2, 2]
 ---
 
-# 消息队列：从异步协作推导端到端可靠性
+# MQ 面试题：先懂共同原理，再分清 RabbitMQ 与 Kafka
 
 消息队列（Message Queue，MQ）不是“接入后就不会丢消息”的保险箱。它把同步调用改造成跨时间、跨进程的异步协作，用解耦、缓冲和独立扩缩容换来了新的问题：消息可能延迟、重复、乱序、积压，也可能只在部分节点成功。
 
-本章先建立通用消息模型，再以官方发布标签 [`rocketmq-all-5.5.0`](https://github.com/apache/rocketmq/releases/tag/rocketmq-all-5.5.0) 验证存储、消费和事务回查机制。RabbitMQ、Kafka 与 RocketMQ 的术语和能力不同，稳定原理与产品实现会分开说明。产品专项题请进入 [RabbitMQ 面试题](./rabbitmq) 和 [Kafka 面试题](./kafka)。
+本章只保留一条学习主线：先从网络、故障和容量约束推导 MQ 的共同原理，再分别理解 RabbitMQ 的“路由队列”和 Kafka 的“分区日志”，最后根据业务场景选型。RocketMQ 作为业务消息方案放在共同原理中补充，不再拆成第三篇重复讲解。
+
+> **先记结论：** RabbitMQ 更像“把任务按规则分到队列，处理完再确认”；Kafka 更像“把事件追加到可保留的日志，不同消费组各自记录读到哪里”。二者都可能丢、重、乱、积压，也都不能代替业务幂等。
+
+## 阅读路线
+
+1. 第一次学习：先读[一条消息的生命周期](#一条消息的生命周期)和[重复窗口](#为什么-ack-和-offset-必然带来重复窗口)。
+2. 准备面试：重点读 [RabbitMQ](#rabbitmq-先看路由-再谈可靠性)、[Kafka](#kafka-把消息队列看成可回放日志)和[场景选型](#产品选型是约束匹配)。
+3. 项目追问：再补 Outbox、RocketMQ 事务消息、积压排查和故障演练。
 
 ## 目标：不预设消息队列
 
@@ -217,7 +225,7 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 事务检查器必须能够根据本地事务记录幂等查询。事务消息保证的是生产者本地事务与消息发布之间的最终一致，**不保证消费者业务自动成功，更不等于端到端恰好一次**；下游仍需重试、幂等和补偿。[RocketMQ 事务消息说明](https://rocketmq.apache.org/docs/featureBehavior/04transactionmessage/)
 
-## 产品选型是约束匹配
+## 先建立产品地图
 
 | 维度 | RabbitMQ | Kafka | RocketMQ |
 | --- | --- | --- | --- |
@@ -239,6 +247,159 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 面试中可以先用共同原理解释“为什么会丢、重、乱、积压”，再切换到产品术语。不要在 RabbitMQ 中说“提交 Offset”，也不要把 Kafka 的 `acks=all` 当成消费者业务 ACK。
 
+## RabbitMQ：先看路由，再谈可靠性
+
+以下内容以 **RabbitMQ 4.1、AMQP 0-9-1** 为版本边界。共同的幂等、顺序、积压和 Outbox 原理不再重复，这里只回答 RabbitMQ 独有的路由、确认和队列模型。
+
+### 1. 消息怎样从生产者走到消费者？ ⭐
+
+**直接回答：** Producer 把消息和 Routing Key 发给 Exchange，Exchange 根据类型和 Binding 路由到一个或多个 Queue，Broker 再把 Queue 中的消息投递给 Consumer。Connection 是 TCP 连接，Channel 是连接上的轻量逻辑通道。
+
+![RabbitMQ 消息从生产者经 Exchange、Binding 路由到队列并完成两段确认的流程](/.image/interview/middleware/mq/rabbitmq-routing-confirm.svg)
+
+**大白话：** Exchange 是分拣台，Routing Key 是包裹标签，Binding 是分拣规则，Queue 才是存放包裹的货架。
+
+**易错边界：** 消息到达 Exchange 不等于进入 Queue。没有 Binding 匹配时，它可能成为不可路由消息；关键消息要结合 `mandatory` 和 Return 回调发现这种情况。
+
+### 2. 四种 Exchange 怎样区分？
+
+| 类型 | 匹配方式 | 典型场景 |
+| --- | --- | --- |
+| direct | Routing Key 与 Binding Key 精确匹配 | 指定业务类型，如 `order.paid` |
+| fanout | 忽略 Routing Key，广播给所有绑定队列 | 同一事件通知多个系统 |
+| topic | `*` 匹配一段，`#` 匹配零到多段 | `order.*.created` 等分层路由 |
+| headers | 根据消息头键值匹配 | 路由条件不适合写成字符串层级 |
+
+**大白话：** direct 是门牌号完全相等，fanout 是全楼广播，topic 是通配门牌，headers 是检查包裹属性。
+
+### 3. Publisher Confirm 和消费者 ACK 有什么区别？ ⭐
+
+**直接回答：** Publisher Confirm 是 Broker 给生产者的发布确认；Consumer ACK 是消费者处理完成后给 Broker 的确认。两者方向相反、发生在不同阶段，任何一个都不能证明另一段已经成功。
+
+**大白话：** Confirm 表示“仓库接住了”，Consumer ACK 表示“收件人办完了”。仓库接货不等于收件人已经处理。
+
+**易错边界：** 不可路由消息也可能收到 Confirm，因此还要检查 Return；Confirm 超时表示结果未知，重发必须复用稳定事件 ID。
+
+### 4. ACK、NACK、Reject、Requeue 和 Prefetch 怎样配合？ ⭐
+
+- `basic.ack`：业务成功，可以删除这次投递。
+- `basic.reject`：拒绝单条消息；`basic.nack` 还能批量拒绝。
+- `requeue=true`：重新排队；`false`：按配置进入 DLX，否则丢弃。
+- Prefetch：限制消费者手中“已投递但未 ACK”的消息数。
+
+**大白话：** 消费者一次只领自己吃得下的任务；办完才签收，临时失败稍后重试，永久失败转异常队列。
+
+**易错边界：** 永久错误持续 `requeue=true` 会形成热循环；Prefetch 过大只会让单个消费者囤积任务，不代表处理更快。
+
+### 5. DLX、TTL 和延迟重试是什么关系？
+
+消息因拒绝且不重新入队、过期或超过队列长度等原因，可以被重新发布到 Dead Letter Exchange，再路由到重试队列或异常队列。常见延迟方案是“TTL 等待队列 + DLX”，消息到期后再进入真正的消费队列。
+
+**大白话：** 暂时失败的任务先去候车室，到时间再回来；超过次数或确定无法处理的任务进入人工异常清单。
+
+**易错边界：** 同一队列混放不同 TTL 时，队头的长 TTL 消息可能挡住后面的短 TTL 消息。DLQ 必须有告警、责任人、失败原因和受控重放，不能只是“存起来”。
+
+### 6. Classic Queue、Quorum Queue 和 Stream 怎样选？ ⭐
+
+| 类型 | 核心模型 | 更适合 | 主要边界 |
+| --- | --- | --- | --- |
+| Classic Queue | 传统任务队列 | 可接受较弱故障保护的普通任务 | 多节点集群不代表消息自动有副本 |
+| Quorum Queue | 基于 Raft 的复制队列 | 关键业务消息 | 多数副本不可用时停止服务，成本更高 |
+| Stream | 按保留策略保存的追加日志 | 大吞吐、历史回放 | 使用方式更接近日志流 |
+
+RabbitMQ 4.0 已移除经典镜像队列能力，旧答案中的 mirrored classic queue 不能当作 4.x 高可用方案。
+
+### RabbitMQ 30 秒表达
+
+“RabbitMQ 的核心是先路由、后排队。Producer 把消息发到 Exchange，Exchange 根据 Routing Key 和 Binding 分到 Queue；生产端用 Publisher Confirm 与 `mandatory` 分别观察 Broker 接收和不可路由，消费端在业务成功后手动 ACK。关键消息通常使用持久化配置和 Quorum Queue，但故障窗口仍会带来重复，所以消费端必须幂等，失败进入有限重试、DLX 和人工处理。”
+
+## Kafka：把消息队列看成可回放日志
+
+以下内容以 **Apache Kafka 4.1** 为版本边界。不要套用 RabbitMQ 的“任务被领取后删除”模型：Kafka 的核心是按保留策略保存的分区追加日志。
+
+### 1. Topic、Partition、Consumer Group 和 Offset 是什么？ ⭐
+
+**直接回答：** Topic 是事件类别，Partition 是并行和局部顺序的分片，Broker 保存分区日志，Replica 提供副本；同一 Consumer Group 内的消费者分担 Partition，每个组用 Offset 保存自己下一次从哪里读取。
+
+![Kafka 按业务键写入分区、副本复制并由不同消费组维护各自 Offset 的流程](/.image/interview/middleware/mq/kafka-partition-consumer-group.svg)
+
+**大白话：** Topic 是一套账本，Partition 是分册，Broker 是书架，Offset 是书签，Consumer Group 是共同读完这套账的团队。不同团队有各自的书签。
+
+**易错边界：** 同一传统 Consumer Group 内，一个 Partition 同一时刻通常只交给一个消费者；消费者数超过 Partition 数，多出来的消费者通常空闲。
+
+### 2. Kafka 为什么吞吐高？
+
+它不是只靠“顺序写”，而是 Partition 并行、追加日志、批量发送与拉取、批次压缩、页缓存和批量网络传输共同作用。
+
+**大白话：** 不为每张纸单独派车，而是压成一批，沿多条车道整车运输。
+
+**易错边界：** `batch.size`、`linger.ms`、压缩和 Fetch 大小都在交换吞吐、延迟、CPU 与内存，最终值必须压测。
+
+### 3. Partition 怎样决定并行度和顺序？ ⭐
+
+同一订单需要有序时，用稳定的订单 ID 作为 Key，让同 Key 记录进入同一 Partition；不同 Partition 可以并行，但没有全局顺序。
+
+**易错边界：** 增加 Partition 可能改变 Key 的映射；消费者再把记录交给无序线程池，也会打乱完成顺序。要求全局顺序通常意味着单 Partition，并牺牲吞吐。
+
+### 4. `acks`、ISR、HW 和 LEO 怎样串起来？ ⭐
+
+- `acks=0`：Producer 不等待 Broker 确认。
+- `acks=1`：Leader 写入本地日志后确认。
+- `acks=all`：等待当前 ISR 满足复制确认条件。
+- ISR：当前保持同步资格的副本集合；LEO 是各副本日志末端位置；HW 是普通消费者可见的已提交边界。
+
+关键消息通常组合 `acks=all`、合适的副本因子、`min.insync.replicas` 和禁用非同步副本选主。
+
+**易错边界：** `acks=all` 不是等待配置中的所有 Replica，也不等于任何故障下零丢失；提高最小同步副本数，会在故障时更倾向拒绝写入，这是可靠性与可用性的交换。
+
+### 5. Offset 为什么既可能重复，也可能漏处理？ ⭐
+
+- 先完成数据库业务、后提交 Offset：中间宕机会从旧位置重读，可能重复。
+- 先提交 Offset、后处理业务：中间失败会从新位置继续，可能漏处理。
+
+关键业务通常选择前者，再用事件唯一键、条件更新或下游幂等号保证重复消息只产生一次业务效果。
+
+**大白话：** 宁可一张工单再看一次，也不要把没办的工单标成已办；但再看一次不能重复扣款。
+
+### 6. Rebalance 为什么会暂停或重复？ ⭐
+
+消费组成员加入、离开、失效或订阅的 Partition 变化时，需要重新分配。撤销和接管期间可能暂停；旧消费者业务已成功但 Offset 尚未提交时，新消费者会重复处理。
+
+降低影响要从缩短单批处理、合理设置超时、静态成员、合作式分配和优雅停机入手。不要把所有停顿都归因于 Rebalance，还要检查 GC、网络、Broker 和下游耗时。
+
+### 7. 幂等 Producer、Kafka 事务和业务幂等各管哪一段？ ⭐
+
+幂等 Producer 避免同一生产者会话中的协议级重试在日志里重复写入；Kafka 事务可以把多条 Kafka 写入以及消费 Offset 提交纳入一个原子结果，`read_committed` 消费者只读已提交事务记录。
+
+**易错边界：** Kafka 事务不会自动包含 MySQL、HTTP、短信和人工操作。应用重新构造的同一业务事件也不一定被 Producer 幂等识别，跨系统仍需要业务幂等、Outbox 或补偿。
+
+### 8. 为什么消费后还能回放？Kafka 4.x 还依赖 ZooKeeper 吗？
+
+Kafka 按时间、容量或 Log Compaction 等策略保留数据，消费组移动 Offset 不会删除日志，因此保留窗口内可以重置 Offset 重放。Partition 的日志切成 Segment，并使用稀疏索引帮助定位。
+
+Kafka 4.0 起只支持 KRaft 模式，元数据由 Kafka Controller Quorum 管理；ZooKeeper 属于旧版本架构和迁移历史。
+
+**易错边界：** 可回放不等于永久保存，超过保留窗口的数据无法靠重置 Offset 找回；Compaction 也是后台渐进过程，不保证任意时刻每个 Key 只剩一条物理记录。
+
+### Kafka 30 秒表达
+
+“Kafka 的核心是可保留的分区追加日志。Producer 按 Key 选择 Partition，Partition 提供局部顺序和并行度；副本、ISR、`acks=all` 与 `min.insync.replicas` 共同决定确认边界。Consumer Group 让组内成员分担 Partition，每个组独立维护 Offset，所以能够回放。Offset 与外部数据库不能天然原子提交，工程上通常采用至少一次加业务幂等；Exactly Once 必须说明只覆盖哪些 Kafka 写入和 Offset。”
+
+## 产品选型是约束匹配
+
+先问业务主要是在“分发任务”，还是在“保存事件流”，再比较路由、回放、吞吐、顺序、延迟和团队运维能力。
+
+| 业务约束 | 更自然的选择 | 原因 |
+| --- | --- | --- |
+| 多种 Routing Key、广播和通配规则 | RabbitMQ | Exchange + Binding 的路由表达直接 |
+| 一个任务通常只由一名消费者完成 | RabbitMQ | Queue 的竞争消费模型自然 |
+| 多个系统要独立读取同一份历史事件 | Kafka | Consumer Group 各自维护 Offset |
+| 日志、埋点、CDC、流式处理和历史回放 | Kafka | 分区日志与批量吞吐是主模型 |
+| 订单通知等普通业务事件 | 两者都可以 | 再比较规模、回放、路由和团队成本 |
+| 需要事务消息、定时消息等开箱即用业务能力 | 可评估 RocketMQ | 仍要验证版本、故障边界和运维条件 |
+
+**不要这样答：** “RabbitMQ 可靠、Kafka 吞吐高。”两者都能通过不同配置提高可靠性，也都要在吞吐、延迟、可用性和成本之间取舍。正确回答应先给场景约束，再说明哪种主模型更匹配。
+
 ## 验证与证伪
 
 - 在消费者数据库提交后、ACK 前强制终止进程，验证消息会重投且幂等约束阻止重复生效。
@@ -246,6 +407,9 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 - 暂停消费者并持续生产，观察 Lag 和最老消息年龄；恢复时限制消费速率，验证队列只能缓冲峰值而不能创造下游容量。
 - 在 Outbox 消息发送成功、`markSent` 前注入故障，验证事件会重复发送，消费者幂等仍不可删除。
 - 让事务消息二阶段响应丢失，验证 Broker 回查只能收敛生产者本地事务与消息发布，不能证明下游业务成功。
+- 发送一个没有 Binding 匹配的 RabbitMQ 消息，对比是否启用 `mandatory` 时的返回结果，验证 Confirm 不等于进入目标 Queue。
+- 让 Kafka 的 ISR 数低于 `min.insync.replicas`，验证 `acks=all` 的生产请求会失败，而不是在副本不足时继续承诺高可靠。
+- 固定 Key 发送 Kafka 事件后增加 Partition，观察映射变化，证伪“同 Key 在扩容前后天然保持连续顺序”。
 
 如果测试只覆盖正常路径，就不能支持“可靠消息”的结论；至少要覆盖发送不确定、消费重复、Broker/消费者重启和长期未收敛四类反例。
 
@@ -331,7 +495,7 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 ### 18. RabbitMQ、Kafka 和 RocketMQ 怎样选型？
 
-检查点：先给业务约束、故障目标和运维条件，再说明产品匹配，不能只列标签。继续追问见 [RabbitMQ 专项](./rabbitmq) 与 [Kafka 专项](./kafka)。
+检查点：先给业务约束、故障目标和运维条件，再说明产品匹配，不能只列标签；继续追问本章的 [RabbitMQ](#rabbitmq-先看路由-再谈可靠性) 与 [Kafka](#kafka-把消息队列看成可回放日志)。
 
 ### 30 秒表达骨架
 
@@ -343,6 +507,14 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 ## 参考资料
 
+- [RabbitMQ 4.1：Exchanges](https://www.rabbitmq.com/docs/4.1/exchanges)
+- [RabbitMQ：Consumer Acknowledgements and Publisher Confirms](https://www.rabbitmq.com/docs/confirms)
+- [RabbitMQ 4.1：Dead Letter Exchanges](https://www.rabbitmq.com/docs/4.1/dlx)
+- [RabbitMQ：Quorum Queues](https://www.rabbitmq.com/docs/quorum-queues)
+- [Apache Kafka 4.1：Design](https://kafka.apache.org/41/design/design/)
+- [Apache Kafka 4.1：Producer Configs](https://kafka.apache.org/41/configuration/producer-configs/)
+- [Apache Kafka 4.1：Consumer Configs](https://kafka.apache.org/41/configuration/consumer-configs/)
+- [Apache Kafka 4.1：KRaft 与 ZooKeeper](https://kafka.apache.org/41/getting-started/zk2kraft/)
 - [RocketMQ 5.5.0 发布标签](https://github.com/apache/rocketmq/releases/tag/rocketmq-all-5.5.0)
 - [RocketMQ：CommitLog](https://github.com/apache/rocketmq/blob/rocketmq-all-5.5.0/store/src/main/java/org/apache/rocketmq/store/CommitLog.java)
 - [RocketMQ：并发消费服务](https://github.com/apache/rocketmq/blob/rocketmq-all-5.5.0/client/src/main/java/org/apache/rocketmq/client/impl/consumer/ConsumeMessageConcurrentlyService.java)
@@ -351,4 +523,4 @@ RocketMQ 5.5.0 的 [`TransactionalMessageServiceImpl.check`](https://github.com/
 
 ---
 
-[← 数据访问：MyBatis](../persistence/mybatis) · [RabbitMQ 专项](./rabbitmq) · [Kafka 专项](./kafka) · [下一层：分布式系统 →](../distributed/question)
+[← 数据访问：MyBatis](../persistence/mybatis) · [下一层：分布式系统 →](../distributed/question)

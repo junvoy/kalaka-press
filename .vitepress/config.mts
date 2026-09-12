@@ -91,9 +91,7 @@ export default defineConfig({
           text: '消息与系统集成',
           collapsed: true,
           items: [
-            { text: '消息队列共同原理', link: '/src/interview/middleware/mq' },
-            { text: 'RabbitMQ 面试题', link: '/src/interview/middleware/rabbitmq' },
-            { text: 'Kafka 面试题', link: '/src/interview/middleware/kafka' },
+            { text: '消息队列', link: '/src/interview/middleware/mq' },
             { text: '配置、调度与数据集成', link: '/src/interview/integration/question' }
           ]
         },
