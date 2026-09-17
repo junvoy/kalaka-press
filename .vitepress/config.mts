@@ -67,6 +67,7 @@ export default defineConfig({
           text: '计算机与应用基础',
           collapsed: true,
           items: [
+            { text: '网络协议', link: '/src/interview/web/network-protocol' },
             { text: '网络与 I/O', link: '/src/interview/web/io-network' },
             { text: 'Netty 框架', link: '/src/interview/web/netty' }
           ]

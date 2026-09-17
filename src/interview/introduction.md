@@ -33,7 +33,8 @@
 
 这一层解释请求和数据如何在网络中流动，是后续 Web、RPC、消息队列等技术的共同基础。
 
-- [网络与 I/O](/src/interview/web/io-network)
+- [网络协议](/src/interview/web/network-protocol)：从 DNS、TCP、TLS 到 HTTP，建立请求链路与排障思路。
+- [网络与 I/O](/src/interview/web/io-network)：理解 Java 怎样通过 Buffer、Channel 和 Selector 管理连接。
 
 ## 应用框架与数据访问
 
