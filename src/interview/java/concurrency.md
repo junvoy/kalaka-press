@@ -2,309 +2,218 @@
 outline: [2, 3]
 ---
 
-# 多个执行单元怎样安全共享状态
+# Java 并发：共享状态怎样保持正确？
 
-并发的基本矛盾不是“锁应该选哪一种”，而是多个执行单元可能以无法预先枚举的顺序读写同一状态，程序却仍然要求结果正确、变化可见，并且最终能够继续前进。
+并发章只回答“多个执行单元共享数据时，怎样保证结果正确”。线程怎样创建、排队、取消和复用，放在[多线程与线程池](./multithreading)；集合类自身的结构放在[Java 集合](./collections)。
 
-## 目标：不预设锁和并发包
+## 先建立选择顺序
 
-我们要解决的问题是：在执行顺序不确定、处理器和编译器可以优化、线程可能暂停或失败的条件下，怎样维护共享状态的不变量？
+1. 能不共享，就用局部变量、不可变对象、消息传递或数据分片消除共享。
+2. 只发布一个独立状态，考虑 `volatile`；复合不变量需要锁或原子复合操作。
+3. 冲突少、操作短时可以考虑 CAS；冲突多时要评估自旋浪费。
+4. 需要超时、中断、多个条件队列时考虑 `Lock`；简单互斥先看 `synchronized`。
+5. 选择并发工具后，再验证原子边界、可见性、过载和失败恢复。
 
-学习后应当能够：
-
-1. 从交错执行推导原子性、可见性、有序性和进展问题。
-2. 从可观察顺序推导 JMM 与 happens-before，而不是把主内存类比当规范。
-3. 先判断能否消除共享，再选择 volatile、锁、CAS、并发容器或同步器。
-4. 区分 Java 语言语义与 OpenJDK 21 的锁实现。
-5. 用失败注入证明“线程安全组件”不等于“业务操作整体原子”。
-
-::: tip 本章边界
-本章只解决共享状态的正确性。线程如何创建、排队、取消和复用，统一放在 [多线程与任务调度](./multithreading)。
-:::
-
-## 拆掉现成答案
-
-| 常见说法 | 分类 | 被隐藏的条件 |
-| --- | --- | --- |
-| 多线程就是同时执行 | 模糊类比 | 单核也能交错并发，多核并行也不保证操作顺序 |
-| `volatile` 能让变量线程安全 | 缺条件结论 | 它不能把读取—计算—写回组合成一个原子操作 |
-| CAS 一定比锁快 | 错误绝对化 | 高竞争下重试会消耗 CPU，临界区大小也会改变选择 |
-| `synchronized` 会依次经历偏向、轻量和重量锁 | 版本过时模型 | 偏向锁从 JDK 15 起默认禁用；实现路径不是语言保证 |
-| ConcurrentHashMap 能让一段业务逻辑原子 | 组件边界误判 | 单个并发方法的保证不能覆盖多个调用和外部副作用 |
-| ThreadLocal 能解决线程安全 | 条件结论 | 它通过隔离避免共享，但在线程池中会引入生命周期和泄漏风险 |
-| 公平锁更公平，所以更好 | 单目标判断 | 排队公平通常牺牲吞吐，调度器也不保证严格实时顺序 |
-| 无锁等于没有竞争成本 | 错误命名 | 无阻塞算法仍可能重试、缓存行争用甚至活锁 |
-
-## 从基本事实重新构造
-
-### 从交错执行推导三个安全问题
-
-`count++` 在源码中是一行，最小执行模型却至少包含读取、计算和写回。两个线程都读到 10，再分别写回 11，就丢失一次更新。
-
-由此得到三个独立问题：
-
-- **原子性**：一个不变量涉及的操作不能被其他操作观察到中间状态。
-- **可见性**：一个执行单元的写入，必须在规定的同步关系后被另一个执行单元观察。
-- **有序性**：编译器和处理器可以优化，但不能破坏程序承诺的可观察顺序。
-
-线程安全不是“没有并发”，而是所有允许的执行都满足业务不变量。例如余额不得为负、库存不能重复扣减、发布标志为真时数据必须已经准备完成。
-
-正确性之外还有 **进展保证**：互相等待会死锁，持续让步可能活锁，一个线程长期得不到机会则会饥饿。本章重点解决状态安全，死锁的任务关系在下一章展开。
-
-### 从可观察关系推导 JMM 与 happens-before
-
-真实硬件包含寄存器、缓存和内存层级，编译器也会重排不影响单线程结果的操作。Java 不能用“每次都立刻写回物理主内存”定义跨平台语义，因此 JMM 规定一次读允许观察哪次写，以及同步动作建立怎样的顺序。
-
-如果两个冲突访问没有被 happens-before 排序，程序就存在数据竞争。happens-before 是可观察效果的偏序，不是墙上时钟的先后，也不要求两个动作紧挨执行。
-
-![volatile 发布建立 happens-before 的过程](/.image/interview/java/concurrency/jmm-happens-before.svg)
-
-常用规则来自同一推导：
-
-- 同一线程中，前面的动作按程序顺序 happens-before 后面的动作。
-- 对一个 volatile 变量的写 synchronizes-with 后续观察到它的读。
-- 对一把锁的解锁 synchronizes-with 后续对同一把锁的加锁。
-- 调用 `start()` 前的动作 happens-before 新线程中的动作。
-- 线程中的动作 happens-before 另一个线程从 `join()` 成功返回。
-- happens-before 具有传递性。
-
-JMM 不是 JVM 堆、栈等内存区域，也不是某一种 CPU 缓存实现。
-
-### 先消除共享，再考虑同步
-
-同步的最小成本不是“换更快的锁”，而是让不变量只由一个所有者修改：
-
-1. 方法局部变量不逃逸，天然线程隔离。
-2. 不可变对象发布后没有写冲突。
-3. 按请求、租户或分片划分状态所有权。
-4. 通过消息传递，把修改串行化到一个执行者。
-5. 只有必须共享可变状态时才建立同步协议。
-
-不可变对象更容易安全共享，但其构造期间仍不能让 `this` 逸出；对象包含可变集合时还需要防御性复制。线程安全从来不只是给字段加 `final`。
-
-### 从单变量发布推导 volatile
-
-volatile 读写建立可见性与顺序关系，适合发布已完成状态、配置快照引用和一写多读的停止标志：
-
-```java
-private volatile boolean running = true;
-
-void stop() {
-    running = false;
-}
-```
-
-但 `count++` 依赖旧值并写回新值，volatile 不能把三步合并。若不变量跨多个字段，单独把每个字段设为 volatile 也不能产生整体原子快照。
-
-### 从互斥临界区推导 synchronized 与 Lock
-
-当一组状态变化必须作为整体观察，最直接的方案是给临界区建立唯一所有者。进入锁前竞争所有权，退出锁发布变化。
-
-- `synchronized` 把加锁、解锁和异常退出纳入语言与 JVM 语义，结构清晰。
-- `ReentrantLock` 在相同互斥目标上增加可中断获取、超时尝试、公平策略和多个 Condition 队列，但必须在 `finally` 中释放。
-
-没有特殊能力需求时，结构化的 `synchronized` 更不容易漏释放；需要 `tryLock()`、中断或多个等待条件时再选择 Lock。
-
-![synchronized 稳定语义与 HotSpot 版本实现边界](/.image/interview/java/concurrency/synchronized-lock-upgrade.svg)
-
-上图刻意不再把“偏向→轻量→重量”写成永久升级链。JEP 374 在 JDK 15 默认禁用并弃用偏向锁；OpenJDK 后续又移除了相关代码。Java 稳定保证的是互斥和同步顺序，快速路径、自旋、Lock Record 与 ObjectMonitor 属于固定版本实现。
-
-### 从乐观冲突检测推导 CAS 与原子类
-
-如果更新能表达为“只有当前值仍等于我读到的旧值才写入”，就可以使用 CAS：
-
-```text
-读取旧值 → 计算新值 → 比较并交换
-                    ├─ 成功：完成
-                    └─ 失败：重新读取或放弃
-```
-
-CAS 避免了部分阻塞与唤醒成本，却把竞争转化为重试：
-
-- 高竞争下可能持续占用 CPU。
-- 值从 A 变 B 又回 A 会产生 ABA；需要关注过程时要加入版本。
-- 多字段不变量通常不能靠一个标量 CAS 自然表达。
-
-`AtomicInteger` 维护一个可立即读取的原子值；`LongAdder` 在高竞争写入下把热点拆到多个 Cell，求和时再聚合。后者提高写吞吐，但 `sum()` 不是与所有并发更新冻结在同一时刻的线性化快照，不适合依赖精确即时值的扣减决策。
-
-### 从等待队列推导 AQS、公平性与条件队列
-
-多个线程竞争一个同步状态时，需要原子维护状态，并让失败者等待、在状态变化后被唤醒。AQS 把这个公共骨架抽象为：
-
-```text
-尝试获取同步状态
-  ├─ 成功：进入临界区
-  └─ 失败：进入等待队列并 park
-状态释放 → 唤醒候选节点 → 重新竞争
-```
-
-ReentrantLock、Semaphore、CountDownLatch 等在此骨架上定义不同状态含义：
-
-- 公平锁倾向等待时间更久的节点，减少插队，但增加调度与队列成本。
-- 非公平锁允许刚到的线程直接竞争，可能提高吞吐，也可能增加尾部等待。
-- `Condition` 为一把 Lock 提供多个条件队列；`wait/notify` 绑定对象监视器且只有一个等待集合。
-- 读写锁允许多个读者共享，但写者需要独占；读多写少且临界区足够大时才可能收益。
-
-同步工具不是同义 API：CountDownLatch 表示一次性倒计时门闩，CyclicBarrier 表示一组参与者可重复会合，Semaphore 表示有限许可。选择应从状态机推导。
-
-### 从线程绑定状态推导 ThreadLocal
-
-ThreadLocal 把值关联到当前线程，适合请求上下文等明确的线程内状态。它消除的是线程之间共享同一个值，不是让任意对象变安全。
-
-在线程池中线程寿命通常长于任务：任务结束后不 `remove()`，旧 Value 仍可能被线程长期持有，并污染下一任务。Key 的弱引用不能替代清理，因为 Entry 的 Value 仍是强引用。虚拟线程场景还应避免把昂贵资源当作 ThreadLocal 池，详见下一章。
-
-### 从分段冲突推导 ConcurrentHashMap
-
-并发 Map 必须让无关 Key 尽量独立进展，同时维护扩容、桶初始化和节点更新的正确性。OpenJDK 21 的 `ConcurrentHashMap.putVal` 会按当前状态选择：
-
-![ConcurrentHashMap 写入关键分支](/.image/interview/java/concurrency/concurrenthashmap-put.svg)
-
-1. 表未初始化时先协作初始化。
-2. 空桶尝试 CAS 放入首节点。
-3. 遇到扩容标记时协助迁移。
-4. 非空桶在桶级同步内处理链表或树更新。
-
-这说明“没有全表大锁”不等于“完全无锁”。`compute` 等单方法可以提供更强的原子语义，但把数据库写入、远程调用或另一张 Map 的修改放在方法外，仍需要业务级协议。
-
-### 从争用来源推导优化顺序
-
-降低锁竞争应先找共享热点，再按下列顺序考虑：
-
-1. 缩小共享状态与临界区，但不要把一个不变量拆坏。
-2. 分片计数、按 Key 串行或使用不可变快照。
-3. 避免在持锁期间做 I/O、日志格式化和远程调用。
-4. 读多写少时评估读写锁或 Copy-on-Write，并测量复制成本。
-5. 观察等待时间、持锁时间、队列长度和 CPU，而不是只看锁名称。
-
-## 固定版本的实现与源码验证
-
-- [JLS 21 第 17 章：Threads and Locks](https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html)：JMM、数据竞争和 happens-before 的语言规范。
-- [OpenJDK `jdk-21-ga`](https://github.com/openjdk/jdk/tree/jdk-21-ga)：固定实现入口。
-- [`AbstractQueuedSynchronizer.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/locks/AbstractQueuedSynchronizer.java)：同步状态与等待队列骨架。
-- [`ConcurrentHashMap.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java)：桶级写入、扩容协作与复合操作。
-- [`Striped64.java`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/atomic/Striped64.java)：LongAdder 分散竞争的基础实现。
-- [JEP 374：Deprecate and Disable Biased Locking](https://openjdk.org/jeps/374) 与 [JDK-8256425](https://bugs.openjdk.org/browse/JDK-8256425)：偏向锁的版本边界。
-
-源码证明的是 OpenJDK 21 如何实现稳定语义，不代表其他 JVM 或未来 JDK 必须保持同一对象头和快速路径。
-
-## 最小实验：制造数据竞争
-
-### 实验一：丢失更新
-
-让两个线程各执行十万次 `count++`，分别比较普通 int、volatile int、AtomicInteger 与锁保护的结果。volatile 版本仍可能丢更新，证伪“可见就等于原子”。
-
-### 实验二：安全发布
-
-线程 A 先写普通字段，再写 volatile ready；线程 B 观察 ready 后读取普通字段。删除 volatile 后反复运行并不能保证每次复现错误，但程序已经失去 JMM 保证。不能用“我机器上没错”证明数据竞争正确。
-
-### 实验三：竞争改变最优工具
-
-用 JMH 分别在低竞争和高竞争下比较 AtomicLong 与 LongAdder。记录吞吐与读取语义，不把某一次微基准推广到真实业务。
-
-### 实验四：线程池复用暴露 ThreadLocal
-
-在单线程池提交两个任务，第一个设置 ThreadLocal 但不清理，第二个只读取。观察第二个任务读到旧值，再用 `try/finally remove()` 验证恢复方式。
-
-## 验证与证伪
-
-| 假设 | 改变条件 | 证伪信号 |
-| --- | --- | --- |
-| volatile 能保护计数 | 增加并发 `count++` | 最终值小于期望值 |
-| CAS 永远优于锁 | 提高线程数和冲突率 | 重试与 CPU 开销上升 |
-| 公平锁吞吐也更高 | 对比高频短临界区 | 排队开销可能降低吞吐 |
-| ConcurrentHashMap 让跨调用业务原子 | 在检查与写入之间插入并发线程 | 业务不变量仍可被破坏 |
-| ThreadLocal 会自动清理 | 在线程池复用同一线程 | 后续任务读到旧状态或 Value 长期存活 |
-| 偏向锁是 JDK 21 必经状态 | 对照 JEP 与固定源码 | 版本前提不成立 |
-
-## 工程取舍与失败边界
-
-- 锁提供清晰互斥语义，也可能导致等待、优先级反转和死锁组合。
-- CAS 改善部分低冲突路径，却可能在高冲突下形成重试风暴。
-- 分片计数提高写吞吐，但读取成本和即时一致性语义不同。
-- ThreadLocal 简化参数传递，也隐藏依赖并扩大生命周期风险。
-- 并发容器只能保证文档声明的单个或复合方法边界，不能自动覆盖数据库与远程调用。
-- 优化前必须用 JFR、线程转储、锁事件和业务延迟确认真正热点。
-
-## 理解自测与面试表达
-
-以下 17 个标题保持原样。每题先说不变量，再选择机制，最后说明失败条件。
+## 内存模型与可见性
 
 ### 1. 什么是线程安全？
 
-**正文定位：** 所有允许的交错都保持不变量。**反事实追问：** 单次测试正确为什么不能证明线程安全？**表达骨架：** 30 秒按“共享状态—并发访问—原子/可见/有序—业务不变量”回答。
+**直接回答：** 多个线程以允许的方式交错执行时，程序仍保持业务不变量，并且结果满足对外承诺，才叫线程安全。它不等于“用了并发集合”或“方法加了锁”。
 
-### 2. 什么是 Java 内存模型（JMM）？
+```java
+if (stock > 0) { // 检查
+    stock--;     // 修改
+}
+```
 
-**正文定位：** 读写可观察关系。**反事实追问：** JMM 为什么不是堆、栈内存图？**表达骨架：** 3 分钟讲跨平台语义、数据竞争、同步动作和实现边界。
+即使单次读写本身原子，“检查后再修改”仍是复合操作；两个线程可能都看到库存大于 0。判断线程安全要先写出不变量，例如“库存不能小于 0”“同一订单只能扣款一次”，再确定哪一段必须原子执行。
+
+### 2. Java 内存模型（JMM）解决什么问题？
+
+**直接回答：** JMM 规定线程之间何时必须看见写入、哪些操作具有顺序关系，以及读写在什么条件下构成数据竞争。它屏蔽了处理器缓存、编译器优化和指令重排的差异，但不会自动让有竞争的代码正确。
+
+并发常说的三个问题分别是：
+
+- **原子性：** 一个操作是否会被中途观察到部分结果。
+- **可见性：** 一个线程的写入何时对另一个线程可见。
+- **有序性：** 编译器和处理器调整执行顺序后，是否仍满足允许的观察结果。
+
+JMM 是语言层契约，不等于“主内存与工作内存就是某一级 CPU 缓存”的硬件图。
 
 ### 3. 什么是 happens-before？
 
-**正文定位：** 同步顺序偏序。**反事实追问：** A 现实时间更早就一定 happens-before B 吗？**表达骨架：** 30 秒给定义、两条规则和传递示例。
+**直接回答：** 如果操作 A happens-before 操作 B，那么 A 的效果必须对 B 可见，并且在 JMM 的顺序中位于 B 之前。它是可见性与顺序保证，不代表真实时间上两步紧挨着执行。
 
-### 4. `synchronized` 和 `ReentrantLock` 有什么区别？
+常用规则包括：程序次序、监视器解锁先于后续加锁、volatile 写先于后续读、线程 `start()` 与 `join()`，以及传递性。
 
-**正文定位：** 互斥临界区。**反事实追问：** 不需要超时、中断和多个条件时为何仍可能优先 synchronized？**表达骨架：** 3 分钟从共同语义讲到能力、释放方式和选择条件。
+![volatile 发布建立 happens-before 的过程](/.image/interview/java/concurrency/jmm-happens-before.svg)
 
-### 5. `synchronized` 的锁升级是什么？
+```java
+data = load();     // 普通写
+ready = true;      // volatile 写
 
-**正文定位：** 版本边界图。**反事实追问：** JDK 21 为什么不能继续背偏向锁必经链？**表达骨架：** 3 分钟先讲稳定语义，再讲 JDK 8 历史模型与固定源码验证。
+if (ready) {       // volatile 读
+    use(data);     // 必须看见发布前的数据写入
+}
+```
 
-### 6. `volatile` 有什么作用？能保证 `count++` 安全吗？
+### 4. volatile 有什么作用？能保证 `count++` 安全吗？
 
-**正文定位：** 发布与复合操作。**反事实追问：** 多字段不变量各自 volatile 是否整体原子？**表达骨架：** 30 秒讲可见、顺序、不提供复合原子性和适用状态标志。
+**直接回答：** volatile 变量的写与后续读可以建立可见性和顺序保证，适合状态发布、开关和独立配置；它不能把“读—改—写”变成一个原子操作，所以不能单独保证 `count++` 安全。
+
+`count++` 至少包含读取旧值、计算新值和写回。多个线程可能读取同一个旧值并互相覆盖。计数可以使用 `AtomicLong`、`LongAdder`，或把相关状态放进同一临界区；选哪一种还取决于是否需要精确瞬时值和复合不变量。
+
+## 锁、CAS 与同步器
+
+### 5. `synchronized` 和 `ReentrantLock` 怎么选？
+
+**直接回答：** 简单互斥优先 `synchronized`，语法范围结束会自动释放；需要可中断获取、超时尝试、公平策略或多个 `Condition` 时使用 `ReentrantLock`，并在 `finally` 中解锁。
+
+```java
+lock.lock();
+try {
+    updateSharedState();
+} finally {
+    lock.unlock();
+}
+```
+
+两者都提供互斥与相应的内存语义。“Lock 性能一定更高”是过时的无条件结论；性能取决于 JDK、竞争强度、临界区和调度，正确性与所需能力应先于微基准。
+
+### 6. `synchronized` 的“锁升级”应该怎样回答？
+
+**直接回答：** Java 语言只保证监视器的互斥和内存语义；对象头、轻量级锁、重量级锁等是 HotSpot 特定版本的实现。JDK 21 中不能再沿用“无锁 → 偏向锁 → 轻量级锁 → 重量级锁”的固定口诀，因为偏向锁已被禁用并废弃。
+
+![synchronized 稳定语义与 HotSpot 版本实现边界](/.image/interview/java/concurrency/synchronized-lock-upgrade.svg)
+
+稳定原理是：无竞争时 JVM 尽量降低同步开销；出现真实竞争和阻塞需要时，可能使用更重的协调机制。具体状态转换应限定 JVM 与版本，并通过 JOL、JFR 或源码验证，而不是把对象头布局当 Java 规范。
 
 ### 7. CAS 是什么？有什么问题？
 
-**正文定位：** 乐观冲突检测。**反事实追问：** 值 A→B→A 为什么可能骗过比较？**表达骨架：** 3 分钟讲预期值、失败重试、ABA、CPU 和多字段边界。
+**直接回答：** CAS 比较内存中的当前值与期望值，相等才原子地写入新值；失败方可以重试。它避免了某些阻塞，但可能带来 ABA、自旋浪费、公平性差和多变量一致性难题。
 
-### 8. AtomicInteger 和 LongAdder 有什么区别？
+```java
+do {
+    oldValue = counter.get();
+    newValue = oldValue + 1;
+} while (!counter.compareAndSet(oldValue, newValue));
+```
 
-**正文定位：** 单点线性化与分片聚合。**反事实追问：** 为什么 LongAdder 不适合余额扣减判断？**表达骨架：** 30 秒比较竞争、写吞吐和读取语义。
+ABA 表示值从 A 变 B 又回到 A，单看当前值无法知道中间发生过变化。若版本变化有业务意义，可以加入版本戳；若多个字段必须一起保持不变量，锁、不可变状态整体替换或事务往往更直接。
 
-### 9. ThreadLocal 是什么？为什么可能内存泄漏？
+### 8. AtomicLong 和 LongAdder 怎么选？
 
-**正文定位：** 线程绑定生命周期。**反事实追问：** Key 是弱引用为什么 Value 仍可能存活？**表达骨架：** 3 分钟讲隔离、线程池复用、污染和 finally remove。
+**直接回答：** 需要每次更新都落在单一线性化值、随后立即精确读取时用 `AtomicLong`；高并发统计且允许读取时汇总各分片，用 `LongAdder` 降低热点竞争。
 
-### 10. ConcurrentHashMap 为什么适合并发场景？
+LongAdder 在竞争时把更新分散到多个 Cell，读取 `sum()` 再聚合，因此它适合指标累加，不适合“余额扣减后立刻做条件判断”这类依赖单点精确原子值的业务。
 
-**正文定位：** 桶级冲突与扩容协作。**反事实追问：** 两次 `get/put` 组合为何不自动原子？**表达骨架：** 3 分钟按空桶 CAS、非空桶同步、迁移协作和业务边界回答。
+### 9. AQS 是什么？
 
-### 11. AQS 是什么？
+**直接回答：** `AbstractQueuedSynchronizer` 是构建锁和同步器的框架：子类定义同步状态怎样获取与释放，AQS 负责获取失败后的排队、阻塞、唤醒和取消。`ReentrantLock`、`Semaphore`、`CountDownLatch` 等都复用了这种骨架。
 
-**正文定位：** 同步状态与等待队列。**反事实追问：** AQS 为什么不是一把具体锁？**表达骨架：** 30 秒讲状态、获取失败、入队 park、释放唤醒和子类策略。
+理解 AQS 时分三层：同步状态、等待队列、具体同步器的获取规则。AQS 队列不是普通业务队列，也不代表所有同步器只有完全相同的公平语义。
 
-### 12. 公平锁和非公平锁有什么区别？
+### 10. 公平锁和非公平锁有什么区别？
 
-**正文定位：** 排队与吞吐取舍。**反事实追问：** 公平锁能否保证操作系统级严格公平？**表达骨架：** 30 秒比较插队、饥饿风险、吞吐和适用目标。
+**直接回答：** 公平锁倾向让等待更久的线程先获得锁，减少饥饿；非公平锁允许刚到的线程抢占机会，通常能减少调度切换、提高吞吐，但等待时间更不稳定。
 
-### 13. CountDownLatch、CyclicBarrier 和 Semaphore 有什么区别？
+公平不是严格的实时保证，也不意味着业务请求全链路公平。选择要看吞吐、尾延迟和饥饿风险，不能只凭名字判断哪个“更正确”。
 
-**正文定位：** 三种状态机。**反事实追问：** 一次性门闩为什么不能自动复用成下一轮屏障？**表达骨架：** 3 分钟按状态含义、谁等待、能否复用和真实场景选择。
+### 11. `Condition` 和 `wait/notify` 有什么区别？
 
-### 14. `Condition` 和 `wait/notify` 有什么区别？
+**直接回答：** `wait/notify` 依附对象监视器；`Condition` 依附 `Lock`，一个锁可以创建多个条件队列。两者都要求在持有对应锁时等待或通知，并应在循环中重新检查条件。
 
-**正文定位：** 条件等待队列。**反事实追问：** 为什么等待必须放在循环中重新检查条件？**表达骨架：** 30 秒讲绑定对象、队列数量、释放并重获锁与虚假唤醒。
+```java
+lock.lock();
+try {
+    while (queue.isEmpty()) {
+        notEmpty.await();
+    }
+    return queue.removeFirst();
+} finally {
+    lock.unlock();
+}
+```
 
-### 15. 读写锁适合什么场景？
+用 `while` 是因为线程被唤醒时条件可能又被其他线程改变，也可能发生虚假唤醒。通知只是让等待者有资格继续竞争，不是把锁直接交给它。
 
-**正文定位：** 读共享、写独占。**反事实追问：** 临界区很短时为什么可能不如普通锁？**表达骨架：** 30 秒给出读写比例、临界区成本、饥饿与测量条件。
+### 12. CountDownLatch、CyclicBarrier 和 Semaphore 怎么选？
 
-### 16. 什么是不可变对象？为什么它天然更容易线程安全？
+**直接回答：** CountDownLatch 等待一组一次性事件完成；CyclicBarrier 让固定数量的参与者在阶段边界互相等待并可重复使用；Semaphore 用许可证限制同时进入某资源的数量。
 
-**正文定位：** 消除写冲突。**反事实追问：** final 字段引用一个可变 List 就完全不可变吗？**表达骨架：** 30 秒讲构造完成、安全发布、防御性复制和无后续写入。
+- 服务启动等待若干依赖初始化：`CountDownLatch`。
+- 多个并行任务每轮汇合后进入下一轮：`CyclicBarrier`。
+- 限制同时访问下游接口或连接的任务数：`Semaphore`。
 
-### 17. 如何减少锁竞争？
+它们解决的是协调，不自动处理任务失败、超时和资源泄漏；生产代码还要明确取消和兜底。
 
-**正文定位：** 共享热点与临界区。**反事实追问：** 盲目缩小锁范围为何可能拆坏不变量？**表达骨架：** 3 分钟按测量、消除共享、分片、缩短慢操作和验证尾延迟回答。
+### 13. 读写锁适合什么场景？
 
-## 参考资料
+**直接回答：** 共享数据读多写少、读取时间不短，并且读之间确实可以并行时，读写锁可能提高吞吐；写频繁、临界区很短或存在写饥饿时，普通互斥锁可能更简单。
 
-- [JLS 21：Threads and Locks](https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html)
-- [Java SE 21 `java.util.concurrent` API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html)
-- [OpenJDK `jdk-21-ga` 源码](https://github.com/openjdk/jdk/tree/jdk-21-ga)
-- [JEP 374：Deprecate and Disable Biased Locking](https://openjdk.org/jeps/374)
-- [JDK-8256425：Biased Locking Obsoletion](https://bugs.openjdk.org/browse/JDK-8256425)
+“读多写少”只是候选条件。还要测量竞争强度、读锁管理成本、缓存一致性和尾延迟。乐观读工具如 `StampedLock` 还要求读取后验证版本，使用复杂度更高。
+
+## 线程隔离与并发容器
+
+### 14. ThreadLocal 是什么？为什么可能泄漏？
+
+**直接回答：** ThreadLocal 把值绑定到当前线程，适合传递请求上下文等线程私有状态；在线程池中线程会长期复用，如果任务结束不 `remove()`，旧值可能串到后续任务并长期占用内存。
+
+```java
+try {
+    REQUEST_ID.set(requestId);
+    handle();
+} finally {
+    REQUEST_ID.remove();
+}
+```
+
+ThreadLocalMap 的 Key 是弱引用不等于 Value 会立即消失；Entry 仍可能由存活线程间接持有。异步切换线程时，上下文也不会天然传播，应显式传参或使用受控的上下文机制。
+
+### 15. ConcurrentHashMap 为什么适合并发场景？
+
+**直接回答：** 它让读取、不同桶的更新和扩容协作尽量并发进行，避免像 Hashtable 那样让所有常用操作都围绕一个对象监视器串行。JDK 21 写入主要结合 CAS、桶级同步和协作扩容。
+
+![ConcurrentHashMap 写入关键分支](/.image/interview/java/concurrency/concurrenthashmap-put.svg)
+
+它不允许 null Key 和 null Value，以免并发读取时无法区分“没有映射”和“映射值为 null”。单方法线程安全不等于业务复合操作安全，优先使用 `compute`、`merge`、`putIfAbsent` 等原子复合 API，并检查回调是否可能阻塞或递归修改。
+
+### 16. 不可变对象为什么更容易线程安全？
+
+**直接回答：** 对象构造完成后状态不再改变，就没有并发写入与中间状态暴露，多个线程可以安全共享它的值；但仍要保证构造期间没有 `this` 逃逸，并通过正确发布让其他线程看到完整状态。
+
+`final` 字段有特殊初始化安全语义，但 `final List<T>` 只保证引用不重新赋值，不保证列表内容不可变。真正的不可变需要封装可变成员、构造时防御性复制、对外不泄漏修改入口。
+
+### 17. 怎样系统地减少锁竞争？
+
+**直接回答：** 优先减少共享和缩小临界区，再考虑分片、读写分离、原子类或换锁；不要先用更复杂的锁掩盖过大的共享状态。
+
+排查顺序可以是：确认不变量 → 用 JFR/线程转储定位竞争点 → 缩短锁内 I/O 和计算 → 拆分独立状态 → 控制线程数量与过载 → 最后再微调同步原语。增加线程可能让竞争、上下文切换和下游压力更严重。
+
+## 面试表达与验证
+
+### 30 秒回答骨架
+
+> 并发正确性先看共享状态的不变量，再分别处理原子性、可见性和有序性。能消除共享就先消除；只做状态发布可用 volatile，复合不变量用锁或原子复合操作；CAS 适合短操作低冲突，并发容器只保证其契约内的原子边界。最后要用压力测试、JFR 或线程转储验证竞争和失败路径。
+
+### 最小实验
+
+```java
+int count = 0;
+// 多线程各执行很多次 count++，最终结果通常小于期望值。
+```
+
+再依次换成 `volatile int`、`AtomicInteger` 和锁保护，观察 volatile 为什么仍会丢失更新。另在线程池中复用 ThreadLocal 而不清理，验证上下文串用，再补上 `finally remove()`。
+
+## 权威参考
+
+- [JLS 21 第 17 章：Threads and Locks](https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html)
+- [Java SE 21 并发包](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html)
+- [OpenJDK 21 `AbstractQueuedSynchronizer`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/locks/AbstractQueuedSynchronizer.java)
+- [OpenJDK 21 `ConcurrentHashMap`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java)
+- [OpenJDK 21 `Striped64`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/atomic/Striped64.java)
+- [JEP 374：Disable and Deprecate Biased Locking](https://openjdk.org/jeps/374)
 
 ---
 
-[← 上一章：Java 集合](./collections) · [下一章：多线程与任务调度 →](./multithreading)
+[← 上一章：Java 集合](./collections) · [下一章：多线程与线程池 →](./multithreading)

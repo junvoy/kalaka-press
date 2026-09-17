@@ -318,4 +318,4 @@ public abstract long transferTo(
 
 ---
 
-[← Java 核心：Java 8+](../java/modern-java) · [下一章：Netty 框架 →](./netty)
+[← Java 核心：现代 Java（8–21）](../java/modern-java) · [下一章：Netty 框架 →](./netty)

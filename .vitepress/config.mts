@@ -54,13 +54,13 @@ export default defineConfig({
           text: 'Java 核心',
           collapsed: true,
           items: [
-            { text: '学习目录', link: '/src/interview/java/question' },
+            { text: '面试题路线', link: '/src/interview/java/question' },
             { text: '1. Java 基础', link: '/src/interview/java/basic' },
             { text: '2. Java 集合', link: '/src/interview/java/collections' },
-            { text: '3. 并发', link: '/src/interview/java/concurrency' },
-            { text: '4. 多线程', link: '/src/interview/java/multithreading' },
+            { text: '3. 并发正确性', link: '/src/interview/java/concurrency' },
+            { text: '4. 多线程与线程池', link: '/src/interview/java/multithreading' },
             { text: '5. JVM', link: '/src/interview/java/jvm' },
-            { text: '6. Java 8+', link: '/src/interview/java/modern-java' }
+            { text: '6. 现代 Java（8–21）', link: '/src/interview/java/modern-java' }
           ]
         },
         {

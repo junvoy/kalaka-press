@@ -8,13 +8,13 @@ outline: [2, 3]
 
 ## Java 与运行时
 
-- [Java 核心学习目录](./java/question)
+- [Java 面试题学习路线](./java/question)
 - [Java 基础](./java/basic)
 - [Java 集合](./java/collections)
-- [并发](./java/concurrency)
+- [并发正确性](./java/concurrency)
 - [多线程与线程池](./java/multithreading)
 - [JVM](./java/jvm)
-- [Java 8+ 与现代 Java](./java/modern-java)
+- [现代 Java（8–21）](./java/modern-java)
 
 ## 网络与应用框架
 
@@ -27,7 +27,7 @@ outline: [2, 3]
 
 - [MySQL](./mysql/question)
 - [Redis](./redis/question)
-- [消息队列与 RocketMQ](./middleware/mq)
+- [消息队列：RabbitMQ、Kafka 与 RocketMQ](./middleware/mq)
 - [配置、调度与数据集成](./integration/question)
 
 ## 分布式与工程交付

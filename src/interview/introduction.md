@@ -21,13 +21,13 @@
 
 ## Java 核心
 
-- [Java 核心学习目录（小白版）](/src/interview/java/question)
+- [Java 面试题学习路线](/src/interview/java/question)
   - [Java 基础](/src/interview/java/basic)
   - [Java 集合](/src/interview/java/collections)
-  - [并发](/src/interview/java/concurrency)
-  - [多线程](/src/interview/java/multithreading)
+  - [并发正确性](/src/interview/java/concurrency)
+  - [多线程与线程池](/src/interview/java/multithreading)
   - [JVM](/src/interview/java/jvm)
-  - [Java 8+ 与现代 Java](/src/interview/java/modern-java)
+  - [现代 Java（8–21）](/src/interview/java/modern-java)
 
 ## 计算机与应用基础
 
