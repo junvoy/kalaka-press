@@ -244,6 +244,70 @@ export default {
 
       photoSwipe.on('uiRegister', () => {
         photoSwipe.ui?.registerElement({
+          ariaLabel: '切换全屏',
+          appendTo: 'bar',
+          className: 'pswp__button--fullscreen',
+          html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>',
+          isButton: true,
+          name: 'fullscreen',
+          onClick: async () => {
+            const viewer = photoSwipe.element;
+
+            if (!viewer) {
+              return;
+            }
+
+            if (document.fullscreenElement === viewer) {
+              await document.exitFullscreen();
+              return;
+            }
+
+            await viewer.requestFullscreen();
+          },
+          onInit: (element) => {
+            const syncFullscreenState = () => {
+              element.setAttribute(
+                'aria-pressed',
+                String(document.fullscreenElement === photoSwipe.element)
+              );
+            };
+
+            document.addEventListener('fullscreenchange', syncFullscreenState);
+            photoSwipe.on('destroy', () =>
+              document.removeEventListener('fullscreenchange', syncFullscreenState)
+            );
+            syncFullscreenState();
+          },
+          order: 8,
+          title: '切换全屏',
+        });
+        photoSwipe.ui?.registerElement({
+          appendTo: 'bar',
+          ariaLabel: '下载图片',
+          className: 'pswp__button--download',
+          html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 16v4h14v-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>',
+          isButton: true,
+          name: 'download',
+          onInit: (downloadElement) => {
+            const updateDownload = () => {
+              const source = photoSwipe.currSlide?.data.src;
+
+              if (downloadElement instanceof HTMLAnchorElement && source) {
+                downloadElement.href = source;
+                downloadElement.download = new URL(source, window.location.href)
+                  .pathname.split('/')
+                  .pop() ?? 'image';
+              }
+            };
+
+            photoSwipe.on('change', updateDownload);
+            updateDownload();
+          },
+          order: 9,
+          tagName: 'a',
+          title: '下载图片',
+        });
+        photoSwipe.ui?.registerElement({
           appendTo: 'root',
           className: 'pswp__caption',
           name: 'caption',
@@ -264,6 +328,10 @@ export default {
       photoSwipe.on('destroy', () => {
         if (activePhotoSwipe === photoSwipe) {
           activePhotoSwipe = undefined;
+        }
+
+        if (document.fullscreenElement === photoSwipe.element) {
+          void document.exitFullscreen();
         }
       });
 

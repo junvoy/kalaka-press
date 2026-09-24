@@ -67,7 +67,8 @@ html:not(.dark) .vp-code span {
 }
 
 .pswp__top-bar {
-    padding: 8px 12px;
+    align-items: center;
+    padding: 0 12px;
     background: linear-gradient(to bottom, var(--vp-c-bg), transparent);
 }
 
@@ -75,24 +76,54 @@ html:not(.dark) .vp-code span {
     width: 48px;
     height: 48px;
     border-radius: 999px;
-    transition: background-color 160ms ease, transform 160ms ease;
+    transition: background-color 160ms ease;
 }
 
-.pswp__button:hover {
-    background: var(--vp-c-default-soft);
+.pswp__top-bar .pswp__button .pswp__icn {
+    top: 50%;
+    right: auto;
+    left: 50%;
+    margin: 0;
+    transform: translate(-50%, -50%);
 }
 
-.pswp__button:active {
-    transform: scale(0.94);
+.pswp__top-bar .pswp__button:hover {
+    background: rgb(127 127 127 / 16%);
 }
 
 .pswp__counter {
     height: 48px;
+    margin-top: 0;
     padding: 0 14px;
     color: var(--vp-c-text-2);
     font-size: 14px;
     line-height: 48px;
     text-shadow: none;
+}
+
+.pswp__button--fullscreen,
+.pswp__button--download {
+    display: grid;
+    place-items: center;
+    color: var(--pswp-icon-color);
+    text-decoration: none;
+}
+
+.pswp__button--fullscreen .pswp__icn,
+.pswp__button--download .pswp__icn {
+    width: 22px;
+    height: 22px;
+    color: var(--pswp-icon-color);
+}
+
+.pswp__button--fullscreen:focus-visible,
+.pswp__button--download:focus-visible,
+.pswp__button--close:focus-visible,
+.pswp__button--arrow--prev:focus-visible,
+.pswp__button--arrow--next:focus-visible,
+.pswp__button--zoom:focus-visible {
+    outline: 2px solid var(--pswp-icon-color);
+    outline-offset: 2px;
 }
 
 .pswp__caption {
@@ -144,7 +175,9 @@ html:not(.dark) .vp-code span {
     }
 
     .pswp__top-bar {
-        padding: max(4px, env(safe-area-inset-top)) 4px 0;
+        height: calc(60px + env(safe-area-inset-top));
+        align-items: center;
+        padding: env(safe-area-inset-top) 4px 0;
     }
 
     .pswp__button {
