@@ -82,7 +82,7 @@ try {
 
 ### 6. `synchronized` 的“锁升级”应该怎样回答？
 
-**直接回答：** Java 语言只保证监视器的互斥和内存语义；对象头、轻量级锁、重量级锁等是 HotSpot 特定版本的实现。JDK 21 中不能再沿用“无锁 → 偏向锁 → 轻量级锁 → 重量级锁”的固定口诀，因为偏向锁已被禁用并废弃。
+**直接回答：** Java 语言只保证监视器的互斥和内存语义；对象头、轻量级锁、重量级锁等是 HotSpot 特定版本的实现。JDK 21 中不能再沿用“无锁 → 偏向锁 → 轻量级锁 → 重量级锁”的固定口诀：JEP 374 先在 JDK 15 默认禁用偏向锁，相关实现与选项又在后续版本继续淘汰，偏向锁已不是 JDK 21 的默认锁路径。
 
 ![synchronized 稳定语义与 HotSpot 版本实现边界](/.image/interview/java/concurrency/synchronized-lock-upgrade.svg)
 
@@ -213,6 +213,7 @@ int count = 0;
 - [OpenJDK 21 `ConcurrentHashMap`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java)
 - [OpenJDK 21 `Striped64`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/atomic/Striped64.java)
 - [JEP 374：Disable and Deprecate Biased Locking](https://openjdk.org/jeps/374)
+- [JDK-8256425：JDK 18 淘汰偏向锁实现](https://bugs.openjdk.org/browse/JDK-8256425)
 
 ---
 
