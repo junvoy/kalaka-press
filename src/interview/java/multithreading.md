@@ -172,7 +172,7 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 }
 ```
 
-虚拟线程通常不需要像平台线程那样池化来节省线程对象，但仍要用 Semaphore、连接池或限流器控制稀缺下游资源。长期在 `synchronized` 中执行某些阻塞操作还可能造成载体线程钉住，应通过 JFR 观察，而不是凭 API 名猜测。
+虚拟线程通常不需要像平台线程那样池化来节省线程对象，但仍要用 Semaphore、连接池或限流器控制稀缺下游资源。在本章固定的 JDK 21 边界内，虚拟线程在 `synchronized` 中执行某些阻塞操作可能钉住载体线程，应通过 JFR 观察；JDK 24 的 JEP 491 已移除 `synchronized` 导致的主要钉住限制，因此回答时必须说明版本。
 
 ### 17. 定时任务为什么优先用 ScheduledExecutorService？
 
@@ -200,6 +200,7 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 - [OpenJDK 21 `ThreadPoolExecutor`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/ThreadPoolExecutor.java)
 - [OpenJDK 21 `CompletableFuture`](https://github.com/openjdk/jdk/blob/jdk-21-ga/src/java.base/share/classes/java/util/concurrent/CompletableFuture.java)
 - [JEP 444：Virtual Threads](https://openjdk.org/jeps/444)
+- [JEP 491：Synchronize Virtual Threads without Pinning](https://openjdk.org/jeps/491)
 
 ---
 
