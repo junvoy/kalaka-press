@@ -30,6 +30,7 @@ pnpm docs:dev
 | `pnpm diagrams:check` | 检查 SVG 引用、命名和 draw.io 可编辑数据 |
 | `pnpm typecheck` | 执行 TypeScript 类型检查 |
 | `pnpm docs:build` | 执行全部检查并构建生产站点 |
+| `pnpm site:check` | 检查构建产物、站内链接与维护文档隔离 |
 | `pnpm docs:preview` | 预览生产构建结果 |
 
 ## 项目结构
@@ -66,6 +67,10 @@ pnpm docs:build
 ## Agent 协作
 
 自动化编码工具开始工作前应先阅读 [AGENTS.md](AGENTS.md)，其中记录了本仓库的目录、验证和流程图约定。
+
+技术内容的编写与审核遵循 [内容规范](docs/content-guide.md)。维护说明保留在仓库中，不进入读者页面和本地搜索。VitePress 配置通过 `srcExclude` 排除 `docs/`、`AGENTS.md`、`README.md` 和 `SKILL.md`；`docs:build` 还会检查最终产物，只允许 `src/` 中的正文页面及 404 页面发布，并验证站内链接、锚点和图片引用。站点隔离不改变这些开发文件在 Git 仓库中的可见性。
+
+新增维护文档请放入 `docs/`；页面模板、AI 协作指令、编写计划与构建命令不要写进读者正文。AI 技术文章中的 Prompt 示例、工具调用与模型机制属于正常教学内容，应保留。
 
 ## License
 

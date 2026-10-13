@@ -75,8 +75,8 @@ index.md                   # VitePress 页面入口与元信息
 - 可维护性：所有简历正文集中在一个内容文件。
 - 隐私保护：公开页面不包含可还原的完整敏感信息。
 
-::: tip 当前实现
-[查看 Java / AI Agent 网页简历示例](/src/resume/)。内容维护在 `src/resume/resume.content.ts`，样式维护在 `.vitepress/theme/components/ResumePage.vue`。
+::: tip 阅读示例
+[查看 Java / AI Agent 网页简历示例](/src/resume/)，对照观察求职定位、项目经历、技术能力和联系方式怎样形成清晰的信息层级。
 :::
 
 ## 5. 附件版本

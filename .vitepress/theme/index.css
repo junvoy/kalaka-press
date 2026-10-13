@@ -42,8 +42,13 @@ html:not(.dark) .vp-code span {
     color: var(--shiki-dark, inherit);
 }
 
-.vp-doc img:not([data-no-preview]) {
+.vp-doc img[data-image-preview] {
     cursor: zoom-in;
+}
+
+.vp-doc img[data-image-preview]:focus-visible {
+    outline: 2px solid var(--vp-c-brand-1);
+    outline-offset: 4px;
 }
 
 .vp-doc img[src$='.svg'] {

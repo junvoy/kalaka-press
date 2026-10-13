@@ -9,9 +9,10 @@
   },
   "scripts": {
     "docs:dev": "vitepress dev",
-    "docs:build": "pnpm diagrams:check && pnpm typecheck && vitepress build",
+    "docs:build": "pnpm diagrams:check && pnpm typecheck && vitepress build && pnpm site:check",
     "docs:preview": "vitepress preview",
     "diagrams:check": "node --import tsx scripts/check-diagrams.mts",
+    "site:check": "node --import tsx scripts/check-site.mts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
