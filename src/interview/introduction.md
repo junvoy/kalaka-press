@@ -17,7 +17,6 @@
 
 - [第一性原理学习地图](/src/interview/question)：从数据、执行、通信、状态、一致性和可靠性等基本事实重新构造系统认识。
 - [技术索引](/src/interview/technology-index)：已经知道要查 Java、Spring、MySQL 或 MQ 时，从具体技术快速进入。
-- [第一性原理内容规范](/src/interview/content-guide)：了解本站怎样拆解假设、确认基本事实并重新构造结论。
 
 ## Java 核心
 

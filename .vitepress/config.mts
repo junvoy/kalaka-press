@@ -6,8 +6,10 @@ import { pageReadingTime } from './markdown/page-reading-time.mjs'
 export default defineConfig({
   title: "云程阁",
   description: "Java、AI Agent 与软件系统原理知识库",
-  // 源路径·
+  lang: 'zh-CN',
+  // 保留已发布的 /src/ 路由；维护文档不作为站点页面发布。
   srcDir: '.',
+  srcExclude: ['**/AGENTS.md', '**/README.md', '**/SKILL.md', 'docs/**'],
   // base URL
   base: '/kalaka-press/',
   // 显示最后更新时间
@@ -15,6 +17,7 @@ export default defineConfig({
   // 删除 .html 后缀
   cleanUrls: true,
   markdown: {
+    codeCopyButtonTitle: '复制代码',
     config(md) {
       pageReadingTime(md)
     },
@@ -32,9 +35,9 @@ export default defineConfig({
     // 导航栏
     nav: [
       { text: '首页', link: '/' },
-      { text: '葵花宝典', link: '/src/interview/introduction' },
-      { text: '天机秘卷', link: '/src/interview/ai/' },
-      { text: '青云策', link: '/src/career/' },
+      { text: '后端 · 葵花宝典', link: '/src/interview/introduction', activeMatch: '^/src/interview/(?!ai/)' },
+      { text: 'AI · 天机秘卷', link: '/src/interview/ai/', activeMatch: '^/src/interview/ai/' },
+      { text: '求职 · 青云策', link: '/src/career/', activeMatch: '^/src/(career|resume)/' },
       { text: 'kalaka-admin', link: 'https://redhill.red' }
     ],
 
@@ -46,8 +49,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: '第一性原理学习地图', link: '/src/interview/question' },
-            { text: '技术索引', link: '/src/interview/technology-index' },
-            { text: '第一性原理内容规范', link: '/src/interview/content-guide' }
+            { text: '技术索引', link: '/src/interview/technology-index' }
           ]
         },
         {
@@ -151,26 +153,63 @@ export default defineConfig({
     },
 
     outline: {
-      label: "页面导航"
+      label: "本页目录"
+    },
+
+    sidebarMenuLabel: '章节目录',
+    returnToTopLabel: '返回顶部',
+    skipToContentLabel: '跳到正文',
+    darkModeSwitchLabel: '外观',
+    darkModeSwitchTitle: '切换到深色模式',
+    lightModeSwitchTitle: '切换到浅色模式',
+    docFooter: { prev: '上一篇', next: '下一篇' },
+    notFound: {
+      title: '页面未找到',
+      quote: '可以返回首页选择学习路线，或用搜索查找需要的主题。',
+      linkLabel: '返回云程阁首页',
+      linkText: '返回首页'
     },
 
     // 搜索
     search: {
-      provider: 'local'
+      provider: 'local',
+      options: {
+        translations: {
+          button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+          modal: {
+            displayDetails: '显示详细内容',
+            resetButtonTitle: '清空搜索',
+            backButtonTitle: '关闭搜索',
+            noResultsText: '没有找到相关内容',
+            footer: {
+              selectText: '打开', selectKeyAriaLabel: '回车键',
+              navigateText: '切换', navigateUpKeyAriaLabel: '向上',
+              navigateDownKeyAriaLabel: '向下', closeText: '关闭', closeKeyAriaLabel: 'Esc 键'
+            }
+          }
+        },
+        miniSearch: {
+          options: {
+            // 同一分词函数由 VitePress 序列化给浏览器，保证建索引与查询一致。
+            tokenize: (text) => Array.from(
+              new Intl.Segmenter('zh-CN', { granularity: 'word' }).segment(text)
+            ).filter((part) => part.isWordLike).map((part) => part.segment)
+          }
+        }
+      }
     },
 
 
     lastUpdated: {
       text: '最后更新于',
       formatOptions: {
-        dateStyle: 'short',
-        timeStyle: 'medium'
+        dateStyle: 'medium'
       }
     },
 
     // 页脚
     footer: {
-      message: 'Released under the <a href="https://github.com/junvoy/kalaka-press/blob/main/LICENSE">MIT License.</a>',
+      message: '内容遵循 <a href="https://github.com/junvoy/kalaka-press/blob/main/LICENSE">MIT 许可协议</a>',
       copyright: 'Copyright © 2024-present 云程阁 · <a href="https://github.com/junvoy">Yao</a>'
     },
 
@@ -180,7 +219,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/junvoy' }
+      { icon: 'github', link: 'https://github.com/junvoy/kalaka-press', ariaLabel: '在 GitHub 查看云程阁源码' }
     ]
   }
 })

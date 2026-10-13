@@ -4,7 +4,7 @@ outline: [2, 3]
 
 # 可观测性与交付面试题
 
-本章对应简历中的 Prometheus、Grafana、SLS、Linux、Docker、Jenkins、Kubernetes 和 Nginx。它关注服务上线后如何看见问题、稳定变更和快速恢复。
+服务上线后，需要回答三个问题：怎样发现异常、怎样安全变更、怎样恢复服务。本章结合 Prometheus、Grafana、SLS、Linux、Docker、Jenkins、Kubernetes 和 Nginx，建立观测与交付的基本思路。
 
 ## 监控与运维
 

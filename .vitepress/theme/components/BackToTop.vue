@@ -56,9 +56,9 @@ onUnmounted(() => {
   <Transition name="back-to-top">
     <button
       v-if="isVisible"
-      aria-label="页眉"
+      aria-label="返回顶部"
       class="BackToTop"
-      title="页眉"
+      title="返回顶部"
       type="button"
       @click="scrollToTop"
     >
@@ -133,6 +133,7 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .BackToTop,
   .back-to-top-enter-active,
   .back-to-top-leave-active {
     transition-duration: 0.01ms;

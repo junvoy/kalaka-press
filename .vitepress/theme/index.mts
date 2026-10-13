@@ -10,6 +10,8 @@ import './index.css';
 
 const CONTENT_SELECTOR = '.vp-doc';
 const IMAGE_SELECTOR = 'img:not([data-no-preview])';
+const PREVIEW_SELECTOR = 'img[data-image-preview]';
+const PREVIEW_ATTRIBUTES = ['role', 'tabindex', 'aria-label', 'aria-haspopup'] as const;
 
 type ImageSlideData = SlideData & {
   element: HTMLImageElement;
@@ -65,11 +67,13 @@ const getImageDimensions = (
   });
 };
 
-const createSlideData = async (
+const createSlideData = (
   image: HTMLImageElement
-): Promise<ImageSlideData> => {
+): ImageSlideData => {
   const source = image.currentSrc || image.src;
-  const dimensions = await getImageDimensions(image, source);
+  const dimensions = image.naturalWidth > 0 && image.naturalHeight > 0
+    ? { width: image.naturalWidth, height: image.naturalHeight }
+    : getFallbackDimensions(image);
 
   return {
     alt: image.alt,
@@ -93,6 +97,7 @@ export default {
     let outlineClassObserver: MutationObserver | undefined;
     let outlineScrollFrame: number | undefined;
     let openRequestId = 0;
+    const previewAttributes = new Map<HTMLImageElement, (string | null)[]>();
 
     const syncActiveOutlineLink = () => {
       outlineScrollFrame = undefined;
@@ -171,6 +176,19 @@ export default {
     const destroyImageViewer = () => {
       openRequestId += 1;
       contentElement?.removeEventListener('click', handleImageClick);
+      contentElement?.removeEventListener('keydown', handleImageKeydown);
+      previewAttributes.forEach((values, image) => {
+        PREVIEW_ATTRIBUTES.forEach((attribute, index) => {
+          const value = values[index];
+          if (value == null) {
+            image.removeAttribute(attribute);
+          } else {
+            image.setAttribute(attribute, value);
+          }
+        });
+        image.removeAttribute('data-image-preview');
+      });
+      previewAttributes.clear();
       contentElement = undefined;
       activePhotoSwipe?.destroy();
       activePhotoSwipe = undefined;
@@ -185,7 +203,7 @@ export default {
       }
 
       const images = Array.from(
-        contentElement.querySelectorAll<HTMLImageElement>(IMAGE_SELECTOR)
+        contentElement.querySelectorAll<HTMLImageElement>(PREVIEW_SELECTOR)
       );
       const index = images.indexOf(clickedImage);
 
@@ -193,8 +211,8 @@ export default {
         return;
       }
 
-      const [slides, { default: PhotoSwipeClass }] = await Promise.all([
-        Promise.all(images.map(createSlideData)),
+      const [dimensions, { default: PhotoSwipeClass }] = await Promise.all([
+        getImageDimensions(clickedImage, clickedImage.currentSrc || clickedImage.src),
         import('photoswipe'),
       ]);
 
@@ -203,6 +221,8 @@ export default {
       }
 
       activePhotoSwipe?.destroy();
+      const slides = images.map(createSlideData);
+      Object.assign(slides[index]!, dimensions);
 
       const reducedMotion = window.matchMedia(
         '(prefers-reduced-motion: reduce)'
@@ -242,45 +262,81 @@ export default {
         zoomTitle: '缩放图片',
       });
 
+      // PhotoSwipe requests only the current slide and nearby slides. Resolve
+      // unloaded thumbnails here so opening one diagram keeps the article lazy.
+      const measuredSlides = new Set<number>([index]);
+      photoSwipe.addFilter('itemData', (slideData, slideIndex) => {
+        const image = images[slideIndex];
+
+        if (!image || measuredSlides.has(slideIndex)) {
+          return slideData;
+        }
+
+        measuredSlides.add(slideIndex);
+        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+          Object.assign(slideData, {
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          });
+        } else {
+          void getImageDimensions(image, image.currentSrc || image.src).then((size) => {
+            if (activePhotoSwipe !== photoSwipe) {
+              return;
+            }
+
+            Object.assign(slideData, size);
+            photoSwipe.refreshSlideContent(slideIndex);
+          });
+        }
+
+        return slideData;
+      });
+
       photoSwipe.on('uiRegister', () => {
-        photoSwipe.ui?.registerElement({
-          ariaLabel: '切换全屏',
-          appendTo: 'bar',
-          className: 'pswp__button--fullscreen',
-          html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>',
-          isButton: true,
-          name: 'fullscreen',
-          onClick: async () => {
-            const viewer = photoSwipe.element;
+        if (document.fullscreenEnabled) {
+          photoSwipe.ui?.registerElement({
+            ariaLabel: '切换全屏',
+            appendTo: 'bar',
+            className: 'pswp__button--fullscreen',
+            html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>',
+            isButton: true,
+            name: 'fullscreen',
+            onClick: async (_event, element) => {
+              const viewer = photoSwipe.element;
 
-            if (!viewer) {
-              return;
-            }
+              if (!viewer) {
+                return;
+              }
 
-            if (document.fullscreenElement === viewer) {
-              await document.exitFullscreen();
-              return;
-            }
+              try {
+                if (document.fullscreenElement === viewer) {
+                  await document.exitFullscreen();
+                } else {
+                  await viewer.requestFullscreen();
+                }
+                element.title = '切换全屏';
+              } catch {
+                element.title = '暂时无法切换全屏，请重试';
+              }
+            },
+            onInit: (element) => {
+              const syncFullscreenState = () => {
+                element.setAttribute(
+                  'aria-pressed',
+                  String(document.fullscreenElement === photoSwipe.element)
+                );
+              };
 
-            await viewer.requestFullscreen();
-          },
-          onInit: (element) => {
-            const syncFullscreenState = () => {
-              element.setAttribute(
-                'aria-pressed',
-                String(document.fullscreenElement === photoSwipe.element)
+              document.addEventListener('fullscreenchange', syncFullscreenState);
+              photoSwipe.on('destroy', () =>
+                document.removeEventListener('fullscreenchange', syncFullscreenState)
               );
-            };
-
-            document.addEventListener('fullscreenchange', syncFullscreenState);
-            photoSwipe.on('destroy', () =>
-              document.removeEventListener('fullscreenchange', syncFullscreenState)
-            );
-            syncFullscreenState();
-          },
-          order: 8,
-          title: '切换全屏',
-        });
+              syncFullscreenState();
+            },
+            order: 8,
+            title: '切换全屏',
+          });
+        }
         photoSwipe.ui?.registerElement({
           appendTo: 'bar',
           ariaLabel: '下载图片',
@@ -331,7 +387,7 @@ export default {
         }
 
         if (document.fullscreenElement === photoSwipe.element) {
-          void document.exitFullscreen();
+          void document.exitFullscreen().catch(() => {});
         }
       });
 
@@ -352,7 +408,26 @@ export default {
 
       const target = event.target;
 
-      if (!(target instanceof HTMLImageElement) || !target.matches(IMAGE_SELECTOR)) {
+      if (!(target instanceof HTMLImageElement) || !target.matches(PREVIEW_SELECTOR)) {
+        return;
+      }
+
+      event.preventDefault();
+      target.focus({ preventScroll: true });
+      openRequestId += 1;
+      void openImage(target, openRequestId);
+    }
+
+    function handleImageKeydown(event: KeyboardEvent) {
+      if (
+        (event.key !== 'Enter' && event.key !== ' ') || event.repeat ||
+        event.ctrlKey || event.metaKey || event.shiftKey || event.altKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement) || !target.matches(PREVIEW_SELECTOR)) {
         return;
       }
 
@@ -371,7 +446,21 @@ export default {
         return;
       }
 
+      contentElement.querySelectorAll<HTMLImageElement>(IMAGE_SELECTOR).forEach((image) => {
+        // Authored links and buttons retain their own action and accessible name.
+        if (image.closest('a, button, [role="button"]')) {
+          return;
+        }
+
+        previewAttributes.set(image, PREVIEW_ATTRIBUTES.map((name) => image.getAttribute(name)));
+        image.setAttribute('data-image-preview', '');
+        image.setAttribute('role', 'button');
+        image.setAttribute('tabindex', '0');
+        image.setAttribute('aria-haspopup', 'dialog');
+        image.setAttribute('aria-label', `查看大图：${image.alt.trim() || '图片'}`);
+      });
       contentElement.addEventListener('click', handleImageClick);
+      contentElement.addEventListener('keydown', handleImageKeydown);
     };
 
     onMounted(() => {

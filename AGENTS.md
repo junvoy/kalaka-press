@@ -5,7 +5,7 @@
 ## 开发约定
 
 - 使用 pnpm，版本以 `package.json` 的 `packageManager` 字段为准。
-- 修改后至少执行 `pnpm docs:build`；该命令会同时检查流程图、TypeScript 类型和 VitePress 构建。
+- 修改后至少执行 `pnpm docs:build`；该命令会检查流程图、TypeScript 类型、VitePress 构建及发布产物中的页面、链接和维护内容隔离。
 - 不要直接向 `main` 推送；修改必须在功能分支提交，并通过 Pull Request 合并到 `main`。
 - 不要覆盖与当前任务无关的工作区改动。
 - 未经用户明确要求，不要提交或推送 Git 变更。
@@ -13,6 +13,7 @@
 ## 内容约定
 
 - VitePress 正文放在 `src/`，站点配置和主题放在 `.vitepress/`。
+- 技术内容编写与审核参考 [`docs/content-guide.md`](docs/content-guide.md)。维护文档放在 `docs/`，AI 协作指令、页面模板和编写计划不进入读者正文、导航或搜索。
 - Markdown 中引用仓库根目录 `.image/` 的图片时，统一使用 `/.image/...` 站点根路径；不要使用 `../../../.image/...` 等随页面层级变化的相对路径。VitePress 会根据 `base` 自动处理该路径。
 - Java 技术内容按基础、集合、并发、多线程和 JVM 分章节维护。
 - 内容需要让初学者也能理解；复杂流程优先使用图示，并为图片提供准确的中文替代文本。
